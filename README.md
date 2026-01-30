@@ -28,9 +28,8 @@ This fixed-size approach allows O(1) disk seeking using the formula:
 ## 3. Usage
 
 ```csharp
-// Initialize a new B-Tree with Order 4
-// Order 4 results in a minimum degree (t) of 2
-using (var tree = new BTree("data.bin", 3)) 
+// Initialize a new B-Tree with Order 4.
+using (var tree = new BTree("data.bin", 4)) 
 {
     tree.Insert(42, 100); // Key: 42, Data Pointer: 100
     
