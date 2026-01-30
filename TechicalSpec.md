@@ -59,7 +59,7 @@ The ValidateIntegrity method performs a full audit of the tree to verify:
 ## 5. Terms & Definitions
 
 ### Node States & Memory Management
-* **Free List:** A stack or linked list of Page IDs that have been decommissioned and are ready for immediate reuse. When a node is merged and emptied, its ID is pushed here to prevent the file size from growing unnecessarily.
+* **Free List:** A stack of Page IDs that have been decommissioned and are ready for immediate reuse. When a node is merged and emptied, its ID is pushed here to prevent the file size from growing unnecessarily.
 * **Zombie Node:** A node that has been logically deleted or replaced but cannot be moved to the **Free List** yet because active read transactions are still accessing it. 
 * **Ghost Node:** A placeholder entry or an unmaterialized node. It occupies a slot in the parent’s pointer array but contains no data, often used during massive rebalancing or concurrent splits to reserve a spot on disk.
 
@@ -67,6 +67,7 @@ The ValidateIntegrity method performs a full audit of the tree to verify:
 * **Separator Keys:** These are the keys stored in **Internal Nodes**. They act as "signposts" rather than data points. A separator key $K$ guides the search: all keys in the left subtree are less than $K$, and all keys in the right subtree are greater than or equal to $K$.
 * **Internal Nodes:** Internal Nodes: In Classic B-Trees, internal nodes store keys, data and child pointers. 
 * **Leaf Nodes:** Leaf Nodes: The bottom layer of the tree. These nodes store the data records.
+* **Padded Nodes:** To facilitate seamless node splits and merges, nodes are deliberately over-sized to provide essential buffer padding. This extra capacity ensures the tree remains stable during structural rebalancing without immediate overflow.
 
 ### Key Differences
 | Feature | Classic B-Tree | DiskTwo (B+ Tree) |
