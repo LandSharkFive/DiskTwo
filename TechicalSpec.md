@@ -34,12 +34,12 @@ To prevent infinite file growth, the system uses a FreeList.
 
 ### Compaction 
 An offline maintenance routine that removes fragmentation by:
-1.  Identifying all reachable nodes via a BFS traversal.
+1.  Identifying all reachable nodes via a traversal.
 2.  Re-mapping Live nodes to contiguous IDs in a temporary file.
 3.  Discarding all Zombies (orphaned nodes) and resetting the file pointer.
 
 ### Integrity Validation
-The ValidateIntegrity method performs a full recursive audit of the tree to verify:
+The ValidateIntegrity method performs a full audit of the tree to verify:
 * Key ordering (sorted ascending).
 * Boundary constraints (keys stay within parent ranges).
 * Minimum key requirements (underflow checks).
@@ -65,8 +65,8 @@ The ValidateIntegrity method performs a full recursive audit of the tree to veri
 
 ### Structural Components
 * **Separator Keys:** These are the keys stored in **Internal Nodes**. They act as "signposts" rather than data points. A separator key $K$ guides the search: all keys in the left subtree are less than $K$, and all keys in the right subtree are greater than or equal to $K$.
-* **Internal Nodes:** In this implementation (B+ Tree style), internal nodes store only keys and child pointers. They do **not** store actual data records, allowing for a higher branching factor and faster searches.
-* **Leaf Nodes:** The bottom layer of the tree. These nodes store the actual data records (or pointers to the data) and typically include a pointer to the "Next Leaf" to allow for fast sequential scanning.
+* **Internal Nodes:** Internal Nodes: In Classic B-Trees, internal nodes store keys, data and child pointers. 
+* **Leaf Nodes:** Leaf Nodes: The bottom layer of the tree. These nodes store the data records.
 
 ### Key Differences
 | Feature | Classic B-Tree | DiskTwo (B+ Tree) |
