@@ -56,7 +56,23 @@ The ValidateIntegrity method performs a full recursive audit of the tree to veri
 
 1. Delete Times are within 25% of Insert Times. Both Bulk Load and Compact are quick.
 
+## 5. Terms & Definitions
 
+### Node States & Memory Management
+* **Free List:** A stack or linked list of Page IDs that have been decommissioned and are ready for immediate reuse. When a node is merged and emptied, its ID is pushed here to prevent the file size from growing unnecessarily.
+* **Zombie Node:** A node that has been logically deleted or replaced but cannot be moved to the **Free List** yet because active read transactions are still accessing it. 
+* **Ghost Node:** A placeholder entry or an unmaterialized node. It occupies a slot in the parent’s pointer array but contains no data, often used during massive rebalancing or concurrent splits to reserve a spot on disk.
 
+### Structural Components
+* **Separator Keys:** These are the keys stored in **Internal Nodes**. They act as "signposts" rather than data points. A separator key $K$ guides the search: all keys in the left subtree are less than $K$, and all keys in the right subtree are greater than or equal to $K$.
+* **Internal Nodes:** In this implementation (B+ Tree style), internal nodes store only keys and child pointers. They do **not** store actual data records, allowing for a higher branching factor and faster searches.
+* **Leaf Nodes:** The bottom layer of the tree. These nodes store the actual data records (or pointers to the data) and typically include a pointer to the "Next Leaf" to allow for fast sequential scanning.
 
+### Key Differences
+| Feature | Classic B-Tree | DiskTwo (B+ Tree) |
+| :--- | :--- | :--- |
+| **Data Location** | Stored in every node (Internal & Leaf) | Stored ONLY in Leaf nodes |
+| **Internal Node Role** | Stores Data + Child Pointers | Stores Separator Keys + Child Pointers |
+| **Search Efficiency** | Can end early at any level | Always ends at the Leaf level |
+| **Sequential Scan** | Requires complex tree traversal | Simply follow Next Leaf pointers |
 

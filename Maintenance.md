@@ -17,5 +17,5 @@ To avoid the overhead of 'N' separate Insert operations,  use the BulkLoad metho
 
 ## 3. The FreeList Strategy
 The FreeList is a stack of integers stored at the end of the file. 
-* **Push:** When Delete merges nodes and a node ID becomes zombie, it is pushed to this stack.
+* **Push:** When a node becomes empty due to a merge, its ID is added to the Free List for future allocation.
 * **Pop:** When Insert or Split needs a new node ID, it checks the stack before incrementing Header.NodeCount.
