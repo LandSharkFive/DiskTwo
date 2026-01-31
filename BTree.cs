@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Xml.Linq;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
@@ -156,7 +157,7 @@ namespace DiskTwo
         /// <summary>
         /// Wipe a disk sector by filling with zeros.
         /// </summary>
-        public void ZeroOutDiskSpace(int id)
+        public void ZeroNode(int id)
         {
             if (id < 0)
             {
@@ -378,7 +379,7 @@ namespace DiskTwo
                 // If the old root ID isn't being used by the new root, free it
                 if (vacatedId != x.Id && vacatedId != y.Id && vacatedId != z.Id)
                 {
-                    FreeList.Push(vacatedId);
+                    AddToFreeList(vacatedId);
                 }
             }
 
@@ -479,15 +480,15 @@ namespace DiskTwo
             {
                 int oldId = Header.RootId;
 
-                // Promote the first child to be the new King
+                // Promote the first child to be the new King.
                 Header.RootId = finalRoot.Kids[0];
 
-                // Save the Header immediately so the Audit knows where to start
+                // Save the Header immediately so the Audit knows where to start.
                 SaveHeader();
 
                 // Clean up the evidence of the old root
-                ZeroOutDiskSpace(oldId);
-                FreeList.Push(oldId);
+                ZeroNode(oldId);
+                AddToFreeList(oldId);
             }
         }
 
@@ -659,8 +660,8 @@ namespace DiskTwo
             DiskWrite(node);
 
             // 5. Decommission Z
-            ZeroOutDiskSpace(z.Id);
-            FreeList.Push(z.Id);
+            ZeroNode(z.Id);
+            AddToFreeList(z.Id);
         }
 
         /// <summary>
@@ -867,6 +868,21 @@ namespace DiskTwo
         }
 
         /// ------- FREE LIST -------
+        
+        /// <summary>
+        /// Add node to free list for reuse.
+        /// </summary>
+        private void AddToFreeList(int id)
+        {
+            if (id < 0) return;
+            FreeList.Push(id);
+        }
+
+        public int GetFreeListCount()
+        {
+            return FreeList.Count;
+        }
+
 
         /// <summary>
         /// Persist the in-memory free list to the tail of the file and record its offset/count in the header.
@@ -923,10 +939,6 @@ namespace DiskTwo
             SaveHeader();
         }
 
-        public int GetFreeListCount()
-        {
-            return FreeList.Count;
-        }
 
         /// ------- COMPACT METHODS -------
 
@@ -992,22 +1004,44 @@ namespace DiskTwo
             FreeList.Clear(); // FreeList is now empty as all space is used.
         }
 
+
+        /// <summary>
+        /// Check for valid node offset to prevent EndOfStreamException.
+        /// </summary>
+        private bool IsValidNodeOffset(int nodeId)
+        {
+            if (nodeId < 0) return false;
+
+            // Calculate expected offset: HeaderSize + (nodeId * NodeSize)
+            long offset = HeaderSize + (long)nodeId * Header.PageSize;
+            return offset >= 0 && offset < MyFileStream.Length;
+        }
+
         /// <summary>
         /// Get a hash set of the live nodes.
         /// </summary>
         private void FindLiveNodes(int nodeId, HashSet<int> liveNodes)
         {
-            if (nodeId == -1 || !liveNodes.Add(nodeId)) return;
+            // 1. Boundary Check: Prevent EndOfStreamException
+            if (nodeId < 0 || !IsValidNodeOffset(nodeId) || liveNodes.Contains(nodeId))
+                return;
 
+            liveNodes.Add(nodeId);
             BNode node = DiskRead(nodeId);
+
             if (!node.IsLeaf)
             {
                 for (int i = 0; i <= node.NumKeys; i++)
                 {
-                    FindLiveNodes(node.Kids[i], liveNodes);
+                    int childId = node.Kids[i];
+                    if (childId != -1)
+                    {
+                        FindLiveNodes(childId, liveNodes);
+                    }
                 }
             }
         }
+
 
         /// <summary>
         /// Get a list of zombie node IDs.
@@ -1040,6 +1074,23 @@ namespace DiskTwo
             }
 
             return zombies;
+        }
+
+
+        /// <summary>
+        /// Scans for "Zombie" nodes—allocated nodes that are unreachable from the root.
+        /// Reclaims orphans by zeroing their data and returning them to the FreeList.
+        /// Effectively acts as a garbage collector for the tree structure after 
+        /// intensive operations like Bulk Loading.
+        /// </summary>
+        public void ReclaimOrphans()
+        {
+            var list = GetZombies();
+            foreach (var id in list)
+            {
+                ZeroNode(id);
+                AddToFreeList(id);
+            }
         }
 
 

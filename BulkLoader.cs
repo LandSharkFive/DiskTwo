@@ -39,6 +39,7 @@
             }
 
             FinalizeAndFixRoot(spine);
+            Cleanup();
         }
 
 
@@ -158,6 +159,14 @@
             MyTree.SaveHeader();
         }
 
+        /// <summary>
+        /// Cleanup performs final maintenance tasks after bulk loading.
+        /// </summary>
+        private void Cleanup()
+        {
+            MyTree.ReclaimOrphans();
+            MyTree.SaveHeader();
+        }
 
     }
 }

@@ -147,5 +147,77 @@ namespace UnitTestThree
             File.Delete(myPath);
         }
 
+        [TestMethod]
+        public void BulkLoadFullCapacitySmallOrderOne()
+        {
+            string myPath = "toast.db";
+            int order = 4;
+
+            File.Delete(myPath);
+            using (var tree = new BTree(myPath, order))
+            {
+
+                // 1. Generate 16 sorted keys. 15 works too.
+                List<int> data = new List<int>();
+                for (int i = 1; i <= 16; i++) data.Add(i);
+
+                // 2. Run Bulk Loader.  Set fill factors to 1.0 (100%).
+                BulkLoader loader = new BulkLoader(tree, order, 1.0, 1.0);
+                loader.BulkLoad(data);
+
+                // 3. Search for keys.
+                foreach (int i in data)
+                {
+                    Element pair;
+                    Assert.IsTrue(tree.TrySearch(i, out pair), $"Key missing {i}");
+                }
+
+                // 4. Check for zombies.
+                var list = tree.GetZombies();
+                Console.WriteLine($"Zombies: {list.Count}");
+                Assert.AreEqual(0, list.Count, "Zombies found");
+                Console.WriteLine($"Free List: {tree.GetFreeListCount()}");
+            }
+
+            File.Delete(myPath);
+        }
+
+        [TestMethod]
+        public void BulkLoadFullCapacityMediumOrder()
+        {
+            string myPath = "bear.db";
+            int order = 10;
+
+            File.Delete(myPath);
+            using (var tree = new BTree(myPath, order))
+            {
+
+                // 1. Generate 100 sorted keys.  99 works too.
+                List<int> data = new List<int>();
+                for (int i = 1; i <= 100; i++) data.Add(i);
+
+                // 2. Run Bulk Loader.  Set fill factors to 1.0 (100%).
+                BulkLoader loader = new BulkLoader(tree, order, 1.0, 1.0);
+                loader.BulkLoad(data);
+
+                // 3. Search for keys.
+                foreach (int i in data)
+                {
+                    Element pair;
+                    Assert.IsTrue(tree.TrySearch(i, out pair), $"Key missing {i}");
+                }
+
+                // 4. Check for zombies.
+                var list = tree.GetZombies();
+                Console.WriteLine($"Zombies: {list.Count}");
+                Assert.AreEqual(0, list.Count, "Zombies found");
+                Console.WriteLine($"Free List: {tree.GetFreeListCount()}");
+            }
+
+            File.Delete(myPath);
+        }
+
+
+
     }
 }
