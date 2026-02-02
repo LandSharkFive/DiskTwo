@@ -40,5 +40,6 @@ Keep your storage file lean and verified using the built-in utility methods.
 tree.Compact();
 
 // Run a full recursive audit of B-Tree invariants
-bool isHealthy = tree.ValidateIntegrity();
+tree.ValidateIntegrity();
+
 ```
