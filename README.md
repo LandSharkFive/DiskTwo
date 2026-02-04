@@ -31,7 +31,7 @@ This fixed-size approach allows O(1) disk seeking using the formula:
 // Initialize a new B-Tree with Order 4.
 using (var tree = new BTree("data.bin", 4)) 
 {
-    tree.Insert(42, 100); // Key: 42, Data Pointer: 100
+    tree.Insert(42, 100); // Key: 42, Data: 100
     
     if (tree.TrySearch(42, out Element result)) 
     {
