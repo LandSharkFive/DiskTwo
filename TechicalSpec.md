@@ -70,10 +70,11 @@ The ValidateIntegrity method performs a full audit of the tree to verify:
 * **Padded Nodes:** To facilitate seamless node splits and merges, nodes are deliberately over-sized to provide essential buffer padding. This extra capacity ensures the tree remains stable during structural rebalancing without immediate overflow.
 
 ### Key Differences
-| Feature | Classic B-Tree | DiskTwo (B+ Tree) |
+| Feature | Classic B-Tree | B+ Tree |
 | :--- | :--- | :--- |
 | **Data Location** | Stored in every node (Internal & Leaf) | Stored ONLY in Leaf nodes |
 | **Internal Node Role** | Stores Data + Child Pointers | Stores Separator Keys + Child Pointers |
 | **Search Efficiency** | Can end early at any level | Always ends at the Leaf level |
 | **Sequential Scan** | Requires complex tree traversal | Simply follow Next Leaf pointers |
+
 
