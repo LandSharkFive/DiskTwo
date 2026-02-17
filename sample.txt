@@ -1,0 +1,104 @@
+Select a test:
+7
+Inserting eight items.
+Creating B-Tree of Order 4 (Max 3 keys/node, Max 4 children/node)
+Inserting keys: 10, 20, 30, 40, 50, 60, 70, 80...
+Current B-Tree Structure (Level-Order Traversal):
+[20, 40, 60]
+[10] [30] [50] [70, 80]
+
+10 20 30 40 50 60 70 80
+Searching for key 50
+Key 50 found.
+Deleting key 10.
+B-Tree after deletion of 10:
+[40, 60]
+[20, 30] [50] [70, 80]
+
+
+20 30 40 50 60 70 80
+Maximum element found: Key=80, Data=800
+Minimum element found: Key=20, Data=200
+No Zombies
+Insert fifty items.
+--- Phase 1: Sequential Insertion ---
+Inserted 50 items. Current Root Position: 30
+
+--- Phase 2: Verification ---
+Pass
+No Zombies
+Test insert and delete.
+--- Phase 1: Sequential Insertion ---
+Inserted 10 items. Current Root Position: 5
+
+--- Phase 2: Verification ---
+Pass
+--- Phase 3: Sequential Deletion ---
+RootId: 5
+[6]
+[4] [8]
+[2, 3] [5] [7] [9, 10]
+--- POINTER INTEGRITY CHECK ---
+RootId: 5
+Internal Node 2 [Keys: 0]: Kid[0]->Page 0 |
+Internal Node 5 [Keys: 1]: Kid[0]->Page 7 | Kid[1]->Page 6 |
+Internal Node 6 [Keys: 1]: Kid[0]->Page 4 | Kid[1]->Page 1 |
+Internal Node 7 [Keys: 1]: Kid[0]->Page 3 | Kid[1]->Page 0 |
+--- PRINT BY ROOT ---
+RootId: 5
+NODE 5 (Keys: 1): 6,
+  Child 0 -> ID: 7
+    NODE 7 (Keys: 1): 4,
+      Child 0 -> ID: 3
+        NODE 3 (Keys: 2): 2, 3,
+      Child 1 -> ID: 0
+        NODE 0 (Keys: 1): 5,
+  Child 1 -> ID: 6
+    NODE 6 (Keys: 1): 8,
+      Child 0 -> ID: 4
+        NODE 4 (Keys: 1): 7,
+      Child 1 -> ID: 1
+        NODE 1 (Keys: 2): 9, 10,
+No Zombies
+Bulk Load
+Starting Bulk Load...
+
+--- Verification ---
+--- PHYSICAL DISK DUMP ---
+RootId: 11
+Page 0: [10, 20, 30, 40, 50, 60, 70] (IsLeaf: True)
+Page 1: [90, 100, 110, 120, 130, 140, 150] (IsLeaf: True)
+Page 2: [80, 160, 240, 320, 400, 480, 560] (IsLeaf: False)
+Page 3: [170, 180, 190, 200, 210, 220, 230] (IsLeaf: True)
+Page 4: [250, 260, 270, 280, 290, 300, 310] (IsLeaf: True)
+Page 5: [330, 340, 350, 360, 370, 380, 390] (IsLeaf: True)
+Page 6: [410, 420, 430, 440, 450, 460, 470] (IsLeaf: True)
+Page 7: [490, 500, 510, 520, 530, 540, 550] (IsLeaf: True)
+Page 8: [570, 580, 590, 600, 610, 620, 630] (IsLeaf: True)
+Page 9: [650, 660, 670, 680, 690, 700, 710] (IsLeaf: True)
+Page 10: [720, 800, 880, 960] (IsLeaf: False)
+Page 11: [640] (IsLeaf: False)
+Page 12: [730, 740, 750, 760, 770, 780, 790] (IsLeaf: True)
+Page 13: [810, 820, 830, 840, 850, 860, 870] (IsLeaf: True)
+Page 14: [890, 900, 910, 920, 930, 940, 950] (IsLeaf: True)
+Page 15: [970, 980, 990, 1000] (IsLeaf: True)
+--- POINTER INTEGRITY CHECK ---
+RootId: 11
+Internal Node 2 [Keys: 7]: Kid[0]->Page 0 | Kid[1]->Page 1 | Kid[2]->Page 3 | Kid[3]->Page 4 | Kid[4]->Page 5 | Kid[5]->Page 6 | Kid[6]->Page 7 | Kid[7]->Page 8 |
+Internal Node 10 [Keys: 4]: Kid[0]->Page 9 | Kid[1]->Page 12 | Kid[2]->Page 13 | Kid[3]->Page 14 | Kid[4]->Page 15 |
+Internal Node 11 [Keys: 1]: Kid[0]->Page 2 | Kid[1]->Page 10 |
+--- PRINT BY LEVEL ---
+[640]
+[80, 160, 240, 320, 400, 480, 560] [720, 800, 880, 960]
+[10, 20, 30, 40, 50, 60, 70] [90, 100, 110, 120, 130, 140, 150] [170, 180, 190, 200, 210, 220, 230] [250, 260, 270, 280, 290, 300, 310] [330, 340, 350, 360, 370, 380, 390] [410, 420, 430, 440, 450, 460, 470] [490, 500, 510, 520, 530, 540, 550] [570, 580, 590, 600, 610, 620, 630] [650, 660, 670, 680, 690, 700, 710] [730, 740, 750, 760, 770, 780, 790] [810, 820, 830, 840, 850, 860, 870] [890, 900, 910, 920, 930, 940, 950] [970, 980, 990, 1000]
+Searching for key 750
+Found 750
+No Zombies
+
+Compact
+FreeList Count: 37
+Zombie Count: 0
+File Size: 10624 bytes.
+Final Size: 5592 bytes.
+Space Reclaimed: 5032 bytes.
+FreeList Count: 0

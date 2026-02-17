@@ -1,0 +1,143 @@
+﻿using DiskTwo;
+
+namespace UnitTestFour
+{
+    [TestClass]
+    public sealed class UnitFour
+    {
+
+        [TestMethod]
+        public void TestRoundTripOne()
+        {
+            string path = "golf.db";
+            File.Delete(path);
+
+            int nodeCount;
+
+            // Session 1: Create, Insert, and Delete to populate FreeList
+            int oldOrder = 0;
+            using (var t1 = new BTree(path, order: 4))
+            {
+                for (int i = 1; i <= 10; i++) t1.Insert(i, i * 100);
+
+                // Deleting items to ensure nodes are moved to FreeList
+                t1.Delete(1, 100);
+                t1.Delete(2, 200);
+                nodeCount = t1.Header.NodeCount;
+                oldOrder = t1.Header.Order;
+            }
+
+            // Session 2: Reopen and verify metadata
+            using (var t2 = new BTree(path))
+            {
+                // Verify Header integrity
+                Assert.AreEqual(oldOrder, t2.Header.Order);
+
+                // Verify Data integrity
+                Element result;
+                Assert.IsFalse(t2.TrySearch(1, out result), "Key 1 should not exist.");
+                Assert.IsTrue(t2.TrySearch(10, out result), "Key 10 should exist.");
+                Assert.AreEqual(1000, result.Data);
+
+                // Verify FreeList was loaded.
+                // If we insert now, it should ideally reuse a deleted ID.
+                t2.Insert(11, 1100);
+                Assert.AreEqual(nodeCount, t2.Header.NodeCount);
+
+                // Zombies
+                Assert.AreEqual(0, t2.CountZombies(), "Zombies");
+            }
+
+            File.Delete(path);
+        }
+
+        [TestMethod]
+        public void HeaderAndFreeListRoundTrip()
+        {
+            string path = "raven.db";
+            File.Delete(path);
+
+            int oldOrder = 0;
+            int nodeCountBefore;
+            int keyCountBefore = 0;
+
+            // Create and free some nodes
+            using (var t = new BTree(path, order: 4))
+            {
+                for (int i = 1; i <= 20; i++) t.Insert(i, i);
+                t.Delete(1, 1);
+                t.Delete(2, 2);
+                nodeCountBefore = t.Header.NodeCount;
+                keyCountBefore = t.CountKeys(t.Header.RootId);
+                oldOrder = t.Header.Order;
+            }
+
+            // Reopen and ensure header/free list was preserved
+            using (var t2 = new BTree(path))
+            {
+                Assert.AreEqual(oldOrder, t2.Header.Order);
+                // Reuse a free slot on insert
+                t2.Insert(1000, 1000);
+                Assert.AreEqual(nodeCountBefore, t2.Header.NodeCount, "NodeCount should not increase if free slot reused");
+                int keyCountAfter = t2.CountKeys(t2.Header.RootId);
+                Assert.AreEqual(keyCountBefore + 1, keyCountAfter, "Missing Keys");
+                Assert.AreEqual(0, t2.CountZombies(), "Zombies on reopen");
+            }
+
+            File.Delete(path);
+        }
+
+
+        [TestMethod]
+        public void SmokeTestOne()
+        {
+            string path = "rose.db";
+            File.Delete(path);
+            int oldOrder = 0;
+
+            // Session 1: create, insert, validate in-memory
+            using (var t1 = new BTree(path, order: 10))
+            {
+                t1.Insert(10, 100);
+                t1.Insert(20, 200);
+                t1.Insert(30, 300);
+
+                Element e;
+                Assert.IsTrue(t1.TrySearch(20, out e), "Inserted key 20 must be found");
+                Assert.AreEqual(200, e.Data);
+
+                int count = t1.CountKeys(t1.Header.RootId);
+                Assert.AreEqual(3, count, "Missing Keys");
+
+                // Delete one key to exercise deletion path
+                t1.Delete(20, 200);
+                Assert.IsFalse(t1.TrySearch(20, out e), "Deleted key 20 must not be found");
+
+                t1.ValidateIntegrity();
+                oldOrder = t1.Header.Order;
+            }
+
+            // Session 2: reopen and verify persistence
+            using (var t2 = new BTree(path))
+            {
+                Assert.AreEqual(oldOrder, t2.Header.Order, "Order must match");
+
+                Element e;
+                Assert.IsTrue(t2.TrySearch(10, out e), "Key 10 must persist after reopen");
+                Assert.AreEqual(100, e.Data);
+
+                Assert.IsTrue(t2.TrySearch(30, out e), "Key 30 must persist after reopen");
+                Assert.AreEqual(300, e.Data);
+
+                int count = t2.CountKeys(t2.Header.RootId);
+                Assert.AreEqual(2, count, "Keys missing.");
+
+                t2.ValidateIntegrity();
+                Assert.AreEqual(0, t2.CountZombies(), "No zombie pages expected");
+            }
+
+            File.Delete(path);
+        }
+
+    }
+}
