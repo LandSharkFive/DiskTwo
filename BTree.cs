@@ -1,7 +1,7 @@
 ﻿/*
  * ===========================================================================
  * @title: Classic B-Tree Engine v1.0
- * @author: B. Koivu
+ * @author: Koivu
  * @date: 2026-02-11
  * @type: Software [Algorithm/DataStructure]
  * @description: A pure, disk-resident implementation of the Classic B-Tree 
