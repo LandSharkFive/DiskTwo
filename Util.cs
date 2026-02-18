@@ -1,7 +1,4 @@
-﻿using System.Diagnostics;
-using System.Text;
-
-namespace DiskTwo
+﻿namespace DiskTwo
 {
     public static class Util
     {

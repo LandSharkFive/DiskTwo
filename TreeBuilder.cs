@@ -1,10 +1,7 @@
-﻿using System.Buffers.Text;
-using System.Runtime.ConstrainedExecution;
-
-namespace DiskTwo
+﻿namespace DiskTwo
 {
     /// <summary>
-    /// Implements a bottom-up bulk-loading algorithm to create a balanced B-Tree 
+    /// Implements a top-down bulk-loading algorithm to create a balanced B-Tree 
     /// from a sorted list of elements. This is significantly faster than inserting keys one-by-one.
     /// </summary>
     public class TreeBuilder
