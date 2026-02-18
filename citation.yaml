@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+id: Koivu2026a
+authors:
+  family-names: Koivu
+title: Classic B-Tree Engine v1.0
+version: 1.0.0
+url: https://github.com/landsharkfive/disktwo
+issued:
+  year: 2026
