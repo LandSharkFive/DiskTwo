@@ -1379,6 +1379,65 @@ namespace DiskTwo
         }
 
         /// <summary>
+        /// Efficiently retrieves all unique elements from the tree using a HashSet for deduplication.
+        /// </summary>
+        public List<Element> GetElements()
+        {
+            // We use a HashSet for O(1) lookup speed during the crawl
+            var uniqueSet = new HashSet<Element>();
+
+            if  (Header.RootId == -1)
+                return new List<Element>();
+
+            GetElementsRecursive(Header.RootId, uniqueSet, 0);
+
+            // Convert back to list for the return type
+            return uniqueSet.ToList();
+        }
+
+        private void GetElementsRecursive(int nodeId, HashSet<Element> result, int depth)
+        {
+            // 1. Validate Node ID
+            if (nodeId == -1) return;
+
+            // 2. Prevent infinite recursion (Safety check for corrupted disk pointers)
+            if (depth > 64)
+                throw new InvalidOperationException("Cycle Detected");
+
+            // 3. Attempt Disk Read
+            BNode node = DiskRead(nodeId);
+            if (node == null) return;
+
+            // 4. Process Leaf Nodes
+            if (node.Leaf)
+            {
+                for (int i = 0; i < node.NumKeys; i++)
+                {
+                    result.Add(node.Keys[i]); // HashSet handles the "Contains" check automatically
+                }
+            }
+            else
+            {
+                // 5. Process Internal Nodes (In-Order Traversal)
+                for (int i = 0; i <= node.NumKeys; i++)
+                {
+                    // Visit Child branch
+                    if (node.Kids != null && i < node.Kids.Length)
+                    {
+                        GetElementsRecursive(node.Kids[i], result, depth + 1);
+                    }
+
+                    // Visit the Key at this index
+                    if (i < node.NumKeys)
+                    {
+                        result.Add(node.Keys[i]);
+                    }
+                }
+            }
+        }
+
+
+        /// <summary>
         /// Extracts all tree data into a flat CSV format, acting as a "Recovery Dump."
         /// </summary>
         /// <remarks>
@@ -1412,19 +1471,30 @@ namespace DiskTwo
         {
             if (node.NumKeys == 0) return;
 
-            for (int i = 0; i < node.NumKeys + 1; i++)
+            if (node.Leaf)
             {
-                int pos = node.Kids[i];
-                if (pos >= 0)
+                for (int i = 0; i < node.NumKeys; i++)
                 {
-                    BNode child = DiskRead(pos);
-                    WriteToStream(sw, child);
+                    var searchKey = node.Keys[i];
+                    sw.WriteLine($"{searchKey.Key}, {searchKey.Data}");
                 }
-                if (i < node.NumKeys)
+            }
+            else
+            {
+                for (int i = 0; i <= node.NumKeys; i++)
                 {
-                    sw.Write(node.Keys[i].Key);
-                    sw.Write(", ");
-                    sw.WriteLine(node.Keys[i].Data);
+                    int k = node.Kids[i];
+                    if (k >= 0)
+                    { 
+                        var child = DiskRead(node.Kids[i]);
+                        WriteToStream(sw, child);
+                    }
+
+                    if (i < node.NumKeys)
+                    {
+                        var searchKey = node.Keys[i];
+                        sw.WriteLine($"{searchKey.Key}, {searchKey.Data}");
+                    }
                 }
             }
         }
