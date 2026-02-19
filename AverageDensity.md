@@ -1,9 +1,9 @@
 # Storage Density Analysis: B-Tree Bulk Loader
 
 ## 1. Theoretical Framework
-In a B-Tree of **Order $M$**, the maximum number of keys per node is $M - 1$. 
-Standard incremental insertions typically result in a density of **ln(2) ≈ 69.3%**. 
-The "Lazy Kidnapper" Bulk Load bypasses this by packing nodes to the maximum theoretical limit before "kidnapping" the next key as a separator.
+In a B-Tree of **Order $M$**, the maximum number of keys per node is $M - 1$. Standard incremental insertions typically result in a density of **ln(2) ≈ 69.3%**. 
+The Bulk Loader bypasses this by pre-selecting optimal separator keys to partition the dataset, establishing the upper-level index structure before recursively distributing the remaining data into leaf nodes.
+
 
 ## 2. Density Formula
 The efficiency of the tree is measured by comparing utilized key slots against total allocated space:
