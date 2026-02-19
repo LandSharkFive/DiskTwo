@@ -22,7 +22,7 @@ This fixed-size approach allows $O(1)$ disk seeking by mapping partition IDs to 
 
 
 ## 2. Technical Features
-* **Divide and Conquer Bulk Load**: Bypasses traditional insertion overhead by recursively partitioning the dataset. It selects optimal separator keys to define the index hierarchy before distributing data into the resulting leaf partitions.
+* **Top Down Bulk Load**: Bypasses traditional insertion overhead by recursively partitioning the dataset. It selects optimal separator keys to define the index hierarchy before distributing data into the resulting leaf partitions.
 * **Proactive Deletion**: Implements a preventative strategy during descent. If a partition path encounters a node with only $t-1$ keys, the tree redistributes keys from siblings or performs a merge to maintain structural integrity before continuing.
 * **ID Reclamation**: To optimize disk usage, IDs from decommissioned nodes are managed via a FreeList. Subsequent partitioning cycles prioritize reclaiming these IDs over extending the file.
 * **Integrity Validation**: Includes a `ValidateIntegrity()` method to verify the recursive properties of the tree, detecting circular references, boundary violations, or ordering errors.
