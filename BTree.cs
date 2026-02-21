@@ -35,6 +35,7 @@
 
 
 using System;
+using System.Buffers;
 using System.Collections;
 using System.Text;
 using System.Xml.Linq;
@@ -51,13 +52,7 @@ namespace DiskTwo
 
         private FileStream MyFileStream;
 
-        private readonly Stack<int> FreeList = new Stack<int>();
-
-        /// <summary>
-        /// Pre-allocated buffer of zeros used to wipe disk sectors. 
-        /// Must be >= BTreeHeader.PageSize to ensure a full node can be cleared in one pass.
-        /// </summary>
-        private readonly byte[] ZeroBuffer = new byte[HeaderSize];
+        private readonly HashSet<int> FreeList = new HashSet<int>();
 
         private const int HeaderSize = 4096;
 
@@ -225,33 +220,61 @@ namespace DiskTwo
         /// Wipes a specific node's data on disk by overwriting its sector with zeros.
         /// This is typically used for security or to clean up nodes moved to a free list.
         /// </summary>
+        /// 
         public void ZeroNode(int id)
         {
-            // 1. Guard against invalid IDs
-            if (id < 0)
+            if (id < 0) throw new ArgumentOutOfRangeException(nameof(id));
+
+            // 1. Rent the buffer
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(Header.PageSize);
+
+            try
             {
-                throw new ArgumentOutOfRangeException("Negative disk ID.");
+                // 2. Prepare the array.
+                Span<byte> zeroSpan = buffer.AsSpan(0, Header.PageSize);
+                zeroSpan.Clear();
+
+                // 3. Physical Write
+                long offset = CalculateOffset(id);
+                MyFileStream.Seek(offset, SeekOrigin.Begin);
+                MyFileStream.Write(zeroSpan);
             }
-
-            // 2. Calculate the exact file position.
-            long offset = CalculateOffset(id);
-            MyFileStream.Seek(offset, SeekOrigin.Begin);
-
-            // 3. Perform the wipe.
-            // Ensure we write exactly one PageSize worth of zeros.
-            // If ZeroBuffer is smaller than PageSize, this should be done in a loop.
-            int remaining = Header.PageSize;
-            while (remaining > 0)
+            finally
             {
-                // Write either the full remaining page or the full buffer, whichever is smaller.
-                int toWrite = Math.Min(remaining, ZeroBuffer.Length);
-                MyFileStream.Write(ZeroBuffer, 0, toWrite);
-                remaining -= toWrite;
+                // 4. Return the buffer
+                ArrayPool<byte>.Shared.Return(buffer);
             }
-
-            // 4. Force write to disk to ensure the sector is physically cleared.
-            MyFileStream.Flush();
         }
+
+        //public void ZeroNode(int id)
+        //{
+        //    // 1. Guard against invalid IDs
+        //    if (id < 0)
+        //    {
+        //        throw new ArgumentOutOfRangeException("Negative disk ID.");
+        //    }
+
+        //    // 2. Calculate the exact file position.
+        //    long offset = CalculateOffset(id);
+        //    MyFileStream.Seek(offset, SeekOrigin.Begin);
+
+        //    // 3. Perform the wipe.
+        //    // Ensure we write exactly one PageSize worth of zeros.
+        //    // If ZeroBuffer is smaller than PageSize, this should be done in a loop.
+        //    int remaining = Header.PageSize;
+        //    while (remaining > 0)
+        //    {
+        //        // Write either the full remaining page or the full buffer, whichever is smaller.
+        //        int toWrite = Math.Min(remaining, ZeroBuffer.Length);
+        //        MyFileStream.Write(ZeroBuffer, 0, toWrite);
+        //        remaining -= toWrite;
+        //    }
+
+        //    // 4. Force write to disk to ensure the sector is physically cleared.
+        //    MyFileStream.Flush();
+        //}
+
+
 
         /// <summary>
         /// Synchronizes the internal file stream with the underlying storage device to ensure all changes are persisted.
@@ -272,17 +295,48 @@ namespace DiskTwo
         /// </summary>
         public void SaveHeader()
         {
-            byte[] buffer = new byte[4096];
-            using (var ms = new MemoryStream(buffer))
-            using (var writer = new BinaryWriter(ms))
-            {
-                Header.Write(writer);
-            }
+            // 1. Rent a buffer from the shared pool (No allocation overhead!)
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(4096);
 
-            MyFileStream.Seek(0, SeekOrigin.Begin);
-            MyFileStream.Write(buffer);
-            MyFileStream.Flush();
+            try
+            {
+                // 2. Use a Span to represent exactly 4096 bytes of that buffer
+                Span<byte> bufferSpan = buffer.AsSpan(0, 4096);
+                bufferSpan.Clear(); // Ensure it's zeroed out before writing
+
+                // 3. Use a MemoryStream that doesn't "own" the memory
+                using (var ms = new MemoryStream(buffer, 0, 4096))
+                using (var writer = new BinaryWriter(ms))
+                {
+                    Header.Write(writer);
+                }
+
+                // 4. Perform the high-speed write
+                MyFileStream.Seek(0, SeekOrigin.Begin);
+                MyFileStream.Write(bufferSpan);
+                MyFileStream.Flush();
+            }
+            finally
+            {
+                // 5. Return the buffer to the pool so it can be reused
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
+
+
+        //public void SaveHeader()
+        //{
+        //    byte[] buffer = new byte[4096];
+        //    using (var ms = new MemoryStream(buffer))
+        //    using (var writer = new BinaryWriter(ms))
+        //    {
+        //        Header.Write(writer);
+        //    }
+
+        //    MyFileStream.Seek(0, SeekOrigin.Begin);
+        //    MyFileStream.Write(buffer);
+        //    MyFileStream.Flush();
+        //}
 
         /// <summary>
         /// Load the B-Tree header from disk.
@@ -525,10 +579,15 @@ namespace DiskTwo
         /// </summary>
         public int GetNextId()
         {
-            // If we have a hole in the file, reuse it!
-            if (FreeList.Count > 0)
+            // Get first item.
+            using (var enumerator = FreeList.GetEnumerator())
             {
-                return FreeList.Pop();
+                if (enumerator.MoveNext())
+                {
+                    int nodeId = enumerator.Current;
+                    FreeList.Remove(nodeId);
+                    return nodeId;
+                }
             }
 
             // Append to end of file.
@@ -972,7 +1031,7 @@ namespace DiskTwo
         public void FreeNode(int id)
         {
             if (id < 0) return;
-            if (!FreeList.Contains(id)) FreeList.Push(id);
+            FreeList.Add(id);
         }
 
         /// <summary>
@@ -1026,7 +1085,7 @@ namespace DiskTwo
                 FreeList.Clear();
                 for (int i = 0; i < Header.FreeListCount; i++)
                 {
-                    FreeList.Push(reader.ReadInt32());
+                    FreeList.Add(reader.ReadInt32());
                 }
 
                 // 2. TRUNCATE: Cut the tail off the file.
