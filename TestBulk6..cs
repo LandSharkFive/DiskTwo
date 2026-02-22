@@ -34,8 +34,8 @@ namespace UnitTestSix
 
                 // 5. Check keys.
                 var list = tree.GetKeys();
-                Assert.IsTrue(Util.IsSorted(list), "Not Sorted.");
-                Assert.IsFalse(Util.HasDuplicate(list), "Duplicates");
+                Assert.IsTrue(Util.IsSorted(list), "Keys must be sorted.");
+                Assert.IsFalse(Util.HasDuplicate(list), "Duplicate found");
 
                 // 7. Check searches. 
                 foreach (var key in data)
@@ -75,7 +75,7 @@ namespace UnitTestSix
 
                 // 5. Check for zombies.
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");
-                Assert.IsTrue(tree.GetFreeListCount() < 2, "FreeList too long");
+                Assert.AreEqual(0, tree.GetFreeListCount(), "Free Nodes");
 
                 // 6. Insert 4 more keys to force splits.
                 for (int i = 17; i <= 20; i++) tree.Insert(i, i);
@@ -86,7 +86,7 @@ namespace UnitTestSix
 
                 // 8. Check for zombies again.
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");
-                Assert.IsTrue(tree.GetFreeListCount() < 2, "FreeList too long.");
+                Assert.AreEqual(0, tree.GetFreeListCount(), "Free Nodes");
             }
 
             File.Delete(myPath);
@@ -119,7 +119,7 @@ namespace UnitTestSix
 
                 // 5. Check for zombies.
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");
-                Assert.IsTrue(tree.GetFreeListCount() < 3, "FreeList too long");
+                Assert.AreEqual(0, tree.GetFreeListCount(), "Free Nodes");
 
                 // 6. Insert 6 more keys to force splits.
                 for (int i = 25; i <= 30; i++) tree.Insert(i, i);
@@ -130,7 +130,7 @@ namespace UnitTestSix
 
                 // 8. Check for zombies again.
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");    
-                Assert.IsTrue(tree.GetFreeListCount() < 1, "FreeList too long");
+                Assert.AreEqual(0, tree.GetFreeListCount(), "Free Nodes");
             }
 
             File.Delete(myPath);
@@ -166,7 +166,7 @@ namespace UnitTestSix
 
                 // 5. Check for zombies.
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");
-                Assert.IsTrue(tree.GetFreeListCount() < 3, "FreeList too long");
+                Assert.AreEqual(0, tree.GetFreeListCount(), "Free Nodes");
 
                 // 6. Insert 10 more keys to force splits.
                 for (int i = 51; i <= 60; i++) tree.Insert(i, i);
@@ -177,7 +177,7 @@ namespace UnitTestSix
 
                 // 8. Check for zombies again.
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");
-                Assert.IsTrue(tree.GetFreeListCount() < 1, "FreeList too long");
+                Assert.AreEqual(0, tree.GetFreeListCount(), "Free Nodes");
             }
 
             File.Delete(myPath);
@@ -224,24 +224,24 @@ namespace UnitTestSix
                 // 5. Check Root.
                 Assert.IsTrue(tree.Header.RootId != -1, "Root");
 
-                // 6. Fetch keys for the sort/count check
+                // 6. Get the keys for the sort and count checks.
                 var keys = tree.GetKeys();
 
                 // 7. Integrity Checks
                 Assert.AreEqual(count, keys.Count, "Missing Keys");
-                Assert.IsTrue(Util.IsSorted(keys), "Not sorted");
+                Assert.IsTrue(Util.IsSorted(keys), "Keys must be sorted.");
                 Assert.IsFalse(Util.HasDuplicate(keys), "Duplicates");
                 Assert.AreEqual(0, report.ZombieCount, "Zombie");
                 Assert.AreEqual(0, report.GhostCount, "Ghost");
-                Assert.IsTrue(report.Height < 10, "Tree too tall");
+                Assert.IsTrue(report.Height < 10, "Height must be less than 10.");
                 Assert.IsTrue(report.AverageDensity > 35.0, "Low Density");
-                Assert.IsTrue(tree.GetFreeListCount() < 8, "FreeList too long");
+                Assert.IsTrue(tree.GetFreeListCount() < 8, "Free Nodes");
 
                 // 8. Check Max.
                 Element? lastKey = tree.FindMax();
                 if (lastKey.HasValue)
                 {
-                    Assert.AreEqual(count, lastKey.Value.Key, "Max Key Fail");
+                    Assert.AreEqual(count, lastKey.Value.Key, "Max Key Search Failed.");
                 }
                 else
                 {
@@ -311,22 +311,22 @@ namespace UnitTestSix
 
                 // 6. Integrity Checks
                 Assert.AreEqual(count, keys.Count, "Missing Keys");
-                Assert.IsTrue(Util.IsSorted(keys), "Not sorted");
+                Assert.IsTrue(Util.IsSorted(keys), "Keys must be sorted.");
                 Assert.IsFalse(Util.HasDuplicate(keys), "Duplicates");
                 Assert.AreEqual(0, report.ZombieCount, "Zombie");
                 Assert.AreEqual(0, report.GhostCount, "Ghost");
-                Assert.IsTrue(report.Height < 10, "Tree too tall");
-                Assert.IsTrue(tree.GetFreeListCount() < 8, "FreeList too long");
+                Assert.IsTrue(report.Height < 10, "Height must be 10 or less.");
+                Assert.IsTrue(tree.GetFreeListCount() < 8, "Free Nodes");
                 if (tree.Header.NodeCount > 10)
                 {
-                    Assert.IsTrue(report.AverageDensity > 35.0, $"Low Density: {report.AverageDensity}%");
+                    Assert.IsTrue(report.AverageDensity > 35.0, $"Density must be 35% or more.");
                 }
 
                 // 7. Check Max.
                 Element? lastKey = tree.FindMax();
                 if (lastKey.HasValue)
                 {
-                    Assert.AreEqual(count, lastKey.Value.Key, "Max Key Fail");
+                    Assert.AreEqual(count, lastKey.Value.Key, "Max Key Search Failed");
                 }
                 else
                 {
@@ -337,7 +337,7 @@ namespace UnitTestSix
                 Element? firstKey = tree.FindMin();
                 if (firstKey.HasValue)
                 {
-                    Assert.AreEqual(1, firstKey.Value.Key, "Min Key Fail");
+                    Assert.AreEqual(1, firstKey.Value.Key, "Min Key Search Failed");
                 }
                 else
                 {

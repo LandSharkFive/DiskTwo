@@ -49,8 +49,8 @@ namespace UnitTestThree
                 // 7. Verify keys.
                 var list = tree.GetKeys();
                 Assert.AreEqual(data.Count, list.Count);
-                Assert.IsTrue(Util.IsSorted(list), "Not Sorted");
-                Assert.IsFalse(Util.HasDuplicate(list), "Duplicate");
+                Assert.IsTrue(Util.IsSorted(list), "Keys must be sorted.");
+                Assert.IsFalse(Util.HasDuplicate(list), "Duplicate found");
 
                 // 8. Zombies
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");
@@ -91,18 +91,14 @@ namespace UnitTestThree
                     Assert.IsTrue(tree.TrySearch(item.Key, out pair), $"Missing Key {item.Key}");
                 }
 
-                var sortedKeys = tree.GetKeys();
-                Assert.IsTrue(Util.IsSorted(sortedKeys), "Not sorted.");
-                Assert.IsFalse(Util.HasDuplicate(sortedKeys), "Duplicate keys found.");
-
                 // 6. Check for ghosts
                 tree.CheckGhost();
 
                 // 7. Verify keys.
                 var list = tree.GetKeys();
                 Assert.AreEqual(data.Count, list.Count);
-                Assert.IsTrue(Util.IsSorted(list), "Not Sorted");
-                Assert.IsFalse(Util.HasDuplicate(list), "Duplicate");
+                Assert.IsTrue(Util.IsSorted(list), "Keys must be sorted.");
+                Assert.IsFalse(Util.HasDuplicate(list), "Duplicate found");
 
                 // 8. Zombies
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");
@@ -145,8 +141,8 @@ namespace UnitTestThree
                 // 6. Verify keys.
                 var list = tree.GetKeys();
                 Assert.AreEqual(data.Count, list.Count);
-                Assert.IsTrue(Util.IsSorted(list), "Not Sorted");
-                Assert.IsFalse(Util.HasDuplicate(list), "Duplicate keys found.");
+                Assert.IsTrue(Util.IsSorted(list), "Keys must be sorted.");
+                Assert.IsFalse(Util.HasDuplicate(list), "Duplicate key found.");
 
                 // 7. Check for zombies.
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");
@@ -161,7 +157,7 @@ namespace UnitTestThree
             string myPath = "toast.db";
             File.Delete(myPath);
 
-            // 1. Generate 16 sorted keys. N = 15 and 16.
+            // 1. Generate 16 sorted keys. 
             List<Element> data = new List<Element>();
             for (int i = 1; i <= 16; i++) data.Add(new Element(i, i));
 
@@ -188,8 +184,8 @@ namespace UnitTestThree
 
                 // 6. Verify keys.  
                 var sortedKeys = tree.GetKeys();
-                Assert.IsTrue(Util.IsSorted(sortedKeys), "Not sorted.");
-                Assert.IsFalse(Util.HasDuplicate(sortedKeys), "Duplicate keys found.");
+                Assert.IsTrue(Util.IsSorted(sortedKeys), "Keys must be sorted.");
+                Assert.IsFalse(Util.HasDuplicate(sortedKeys), "Duplicate key found.");
 
                 // 7. Check for zombies.
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");
@@ -231,8 +227,8 @@ namespace UnitTestThree
 
                 // 6. Verify keys.
                 var sortedKeys = tree.GetKeys();
-                Assert.IsTrue(Util.IsSorted(sortedKeys), "Not sorted.");
-                Assert.IsFalse(Util.HasDuplicate(sortedKeys), "Duplicate keys found.");
+                Assert.IsTrue(Util.IsSorted(sortedKeys), "Keys must be sorted.");
+                Assert.IsFalse(Util.HasDuplicate(sortedKeys), "Duplicate key found.");
 
                 // 7. Check for zombies.
                 Assert.AreEqual(0, tree.CountZombies(), "Zombies");
@@ -286,12 +282,12 @@ namespace UnitTestThree
 
                 // 8. Verify keys.
                 var sortedKeys = tree.GetKeys();
-                Assert.IsTrue(Util.IsSorted(sortedKeys), "Not sorted.");
+                Assert.IsTrue(Util.IsSorted(sortedKeys), "Keys must be sorted.");
                 Assert.IsFalse(Util.HasDuplicate(sortedKeys), "Duplicate keys found.");
 
 
-                // 9. Check for zombies again.
-                Assert.AreEqual(0, tree.CountZombies(), "Zombies found");
+                // 9. Check for zombies.
+                Assert.AreEqual(0, tree.CountZombies(), "Zombies");
             }
 
             File.Delete(myPath);
@@ -372,7 +368,7 @@ namespace UnitTestThree
                 // 3. Check Root.
                 Assert.IsTrue(tree.Header.RootId != -1, "Root");
 
-                // 4. Verify all keys are present.
+                // 4. All keys must exist.
                 int count = tree.CountKeys(tree.Header.RootId);
                 Assert.AreEqual(data.Count, count, "Bulk Load Failed.");
 
@@ -389,10 +385,10 @@ namespace UnitTestThree
                 // 7. Insert keys. 
                 foreach (int i in extra) tree.Insert(i, i * 10);
 
-                // 8. Count keys.
+                // 8. Count the keys.
                 count = tree.CountKeys(tree.Header.RootId);
                 int totalKeys = data.Count + extra.Count;
-                Assert.AreEqual(totalKeys, count, "Missing keys.");
+                Assert.AreEqual(totalKeys, count, "Key counts must match.");
 
                 // 9. Search for keys.
                 foreach (int i in extra)
@@ -401,9 +397,9 @@ namespace UnitTestThree
                     Assert.IsTrue(tree.TrySearch(i, out pair), $"Missing Key {i}");
                 }
 
-                // 10. Verify keys.
+                // 10. Check the keys.
                 var sortedKeys = tree.GetKeys();
-                Assert.IsTrue(Util.IsSorted(sortedKeys), "Not sorted.");
+                Assert.IsTrue(Util.IsSorted(sortedKeys), "Keys must be sorted.");
                 Assert.IsFalse(Util.HasDuplicate(sortedKeys), "Duplicate keys found.");
 
                 // 11. Check for zombies again.
@@ -441,23 +437,24 @@ namespace UnitTestThree
 
             using (var tree = new BTree(testPath))
             {
+
+                // 1. Count the keys.
                 Assert.IsTrue(tree.Header.RootId != -1, "Root");
                 int count = tree.CountKeys(tree.Header.RootId);
-                Assert.AreEqual(totalKeys, count, "Missing Keys.");
+                Assert.AreEqual(totalKeys, count, "Key Count must match.");
 
+                // 2. Search every key.
                 var allKeys = tree.GetKeys();
+                bool pass = allKeys.All(k => tree.TrySearch(k, out var e) && e.Data == k * 10);
+                Assert.IsTrue(pass, "Missing Keys");
+                Assert.IsTrue(tree.GetHeight() < 10, "Height must be be 10 or less.");
 
-                bool dataIntegrity = allKeys.All(k => tree.TrySearch(k, out var e) && e.Data == k * 10);
-                Assert.IsTrue(dataIntegrity, "Data Integrity:  FAILED");
-
-                Assert.IsTrue(tree.GetHeight() < 10, "Tree too tall.");
-
-                // 1. Run the high-speed single-pass audit
+                // 3. Run the high-speed single-pass audit.
                 var report = tree.PerformFullAudit();
                 Assert.AreEqual(0, report.ZombieCount, "Zombies");
                 Assert.AreEqual(0, report.GhostCount, "Ghosts");
                 if (tree.Header.NodeCount > 10)
-                    Assert.IsTrue(report.AverageDensity > 25.0, $"Density too low: {report.AverageDensity}");
+                    Assert.IsTrue(report.AverageDensity > 25.0, "Density must be 25% or more.");
             }
             File.Delete(testPath);
         }

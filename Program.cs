@@ -65,7 +65,7 @@
         private static void VerifyBasicOperations()
         {
             Console.WriteLine("Inserting eight items.");
-            string outFileName = "aa.bin";
+            string outFileName = "aa.db";
             File.Delete(outFileName);
 
             // 1. Create the B-Tree (Order 4, meaning max 3 keys per node)
@@ -153,7 +153,7 @@
         private static void VerifySequentialInsert()
         {
             Console.WriteLine("Insert fifty items.");
-            string outFileName = "bb.bin";
+            string outFileName = "bb.db";
             File.Delete(outFileName);
 
             // Small order forces lots of splits
@@ -197,7 +197,7 @@
         private static void VerifyMixedOperations()
         {
             Console.WriteLine("Test insert and delete.");
-            string outFileName = "cc.bin";
+            string outFileName = "cc.db";
             File.Delete(outFileName);
 
             // Small order forces lots of splits.

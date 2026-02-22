@@ -11,7 +11,7 @@ namespace UnitTestTwo
         [TestMethod]
         public void SimpleDeleteOrderFour()
         {
-            string outFileName = "orange.bin";
+            string outFileName = "orange.db";
             File.Delete(outFileName);
 
             // Small order forces lots of splits
@@ -49,7 +49,7 @@ namespace UnitTestTwo
         [TestMethod]
         public void SimpleDeleteOrderFive()
         {
-            string outFileName = "dock.bin";
+            string outFileName = "dock.db";
             File.Delete(outFileName);
 
             // Small order forces lots of splits
@@ -58,7 +58,7 @@ namespace UnitTestTwo
                 // Sequential Insertion 
                 for (int i = 1; i <= 10; i++) tree.Insert(i, i * 10);
 
-                Assert.IsTrue(tree.Header.RootId >= 0, "RootId lost");
+                Assert.IsTrue(tree.Header.RootId >= 0, "Root");
 
                 int count = tree.CountKeys(tree.Header.RootId);
                 Assert.AreEqual(10, count, "Missing Keys");
@@ -71,7 +71,7 @@ namespace UnitTestTwo
 
                 // Deletion
                 tree.Delete(1, 10);
-                Assert.IsTrue(tree.Header.RootId >= 0, "Root lost");
+                Assert.IsTrue(tree.Header.RootId >= 0, "Root");
                 count = tree.CountKeys(tree.Header.RootId);
                 Assert.AreEqual(9, count, "Missing Keys");
 
@@ -89,7 +89,7 @@ namespace UnitTestTwo
         [TestMethod]
         public void SimpleDeleteOrderTen()
         {
-            string outFileName = "bear.bin";
+            string outFileName = "bear.db";
             File.Delete(outFileName);
 
             // Small order forces lots of splits
@@ -101,7 +101,7 @@ namespace UnitTestTwo
                 
                 foreach (int i in data) tree.Insert(i, i * 10);
 
-                Assert.IsTrue(tree.Header.RootId >= 0, "RootId lost");
+                Assert.IsTrue(tree.Header.RootId >= 0, "Root");
                 int count = tree.CountKeys(tree.Header.RootId);
                 Assert.AreEqual(data.Count, count, "Missing Keys");
 
@@ -131,7 +131,7 @@ namespace UnitTestTwo
         [TestMethod]
         public void SimpleDeleteOrderSixteen()
         {
-            string outFileName = "bubble.bin";
+            string outFileName = "bubble.db";
             File.Delete(outFileName);
 
             using (var tree = new DiskTwo.BTree(outFileName, order: 16))

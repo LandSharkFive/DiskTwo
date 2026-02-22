@@ -14,7 +14,7 @@ namespace UnitTestFour
 
             int nodeCount;
 
-            // Session 1: Create, Insert, and Delete to populate FreeList
+            // Session 1: Create, Insert, Delete and Add to FreeList.
             int oldOrder = 0;
             using (var t1 = new BTree(path, order: 4))
             {
@@ -78,10 +78,10 @@ namespace UnitTestFour
                 Assert.AreEqual(oldOrder, t2.Header.Order);
                 // Reuse a free slot on insert
                 t2.Insert(1000, 1000);
-                Assert.AreEqual(nodeCountBefore, t2.Header.NodeCount, "NodeCount should not increase if free slot reused");
+                Assert.AreEqual(nodeCountBefore, t2.Header.NodeCount, "NodeCount should not increase if a free slot is used.");
                 int keyCountAfter = t2.CountKeys(t2.Header.RootId);
                 Assert.AreEqual(keyCountBefore + 1, keyCountAfter, "Missing Keys");
-                Assert.AreEqual(0, t2.CountZombies(), "Zombies on reopen");
+                Assert.AreEqual(0, t2.CountZombies(), "Zombies");
             }
 
             File.Delete(path);
@@ -120,7 +120,7 @@ namespace UnitTestFour
             // Session 2: reopen and verify persistence
             using (var t2 = new BTree(path))
             {
-                Assert.AreEqual(oldOrder, t2.Header.Order, "Order must match");
+                Assert.AreEqual(oldOrder, t2.Header.Order, "Order must match.");
 
                 Element e;
                 Assert.IsTrue(t2.TrySearch(10, out e), "Key 10 must persist after reopen");
@@ -133,7 +133,7 @@ namespace UnitTestFour
                 Assert.AreEqual(2, count, "Keys missing.");
 
                 t2.ValidateIntegrity();
-                Assert.AreEqual(0, t2.CountZombies(), "No zombie pages expected");
+                Assert.AreEqual(0, t2.CountZombies(), "Zombies");
             }
 
             File.Delete(path);

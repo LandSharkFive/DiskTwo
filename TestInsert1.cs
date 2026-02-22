@@ -16,7 +16,7 @@ namespace UnitTestOne
         [TestMethod]
         public void SimpleInsertEight()
         {
-            string outFileName = "rain.bin";
+            string outFileName = "rain.db";
             File.Delete(outFileName);
 
             // 1. Create the B-Tree (Order 4, meaning max 3 keys per node)
@@ -89,7 +89,7 @@ namespace UnitTestOne
         [TestMethod]
         public void MediumInsertFifty()
         {
-            string outFileName = "bagel.bin";
+            string outFileName = "bagel.db";
             File.Delete(outFileName);
 
             // Small order forces lots of splits
@@ -125,7 +125,7 @@ namespace UnitTestOne
         [TestMethod]
         public void MediumInsertHundred()
         {
-            string outFileName = "red.bin";
+            string outFileName = "red.db";
             File.Delete(outFileName);
 
             // Small order forces lots of splits
