@@ -56,7 +56,7 @@
             int required = metadataSize + keysSize + childrenSize;
             if (Header.PageSize < required)
             {
-                throw new Exception($"PageSize {Header.PageSize} is too small for Order {Order}. Needs {required}.");
+                throw new ArgumentException(nameof(Header.PageSize));
             }
         }
 
@@ -84,7 +84,7 @@
         {
             if (node.Id < 0)
             {
-                throw new ArgumentOutOfRangeException("CRITICAL: Writing negative disk id.");
+                throw new ArgumentOutOfRangeException(nameof(node.Id), "Cannot be negative");
             }
 
             long offset = CalculateOffset(node.Id);
@@ -98,10 +98,10 @@
         private long CalculateOffset(int disk)
         {
             if (disk < 0)
-                throw new ArgumentOutOfRangeException(nameof(disk), "Node ID cannot be negative.");
+                throw new ArgumentOutOfRangeException(nameof(disk), "Cannot be negative");
 
             if (Header.PageSize < 64)
-                throw new ArgumentException("Invalid Page Size.");
+                throw new ArgumentException(nameof(Header.PageSize));
 
             return ((long)Header.PageSize * disk) + HeaderSize;
         }

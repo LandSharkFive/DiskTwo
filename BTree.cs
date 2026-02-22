@@ -37,6 +37,7 @@
 using System;
 using System.Buffers;
 using System.Collections;
+using System.IO;
 using System.Text;
 using System.Xml.Linq;
 
@@ -51,6 +52,10 @@ namespace DiskTwo
         private string MyFileName { get; set; }
 
         private FileStream MyFileStream;
+
+        private BinaryReader MyReader;
+
+        private BinaryWriter MyWriter;
 
         private readonly HashSet<int> FreeList = new HashSet<int>();
 
@@ -69,7 +74,7 @@ namespace DiskTwo
         {
             if (string.IsNullOrEmpty(fileName))
             {
-                throw new ArgumentException("File name cannot be null or empty.");
+                throw new ArgumentException("File name cannot be empty.");
             }
 
             if (order < 4)
@@ -79,25 +84,53 @@ namespace DiskTwo
 
             MyFileName = fileName;
 
-            // 1. Always open the stream first
-            MyFileStream = new FileStream(MyFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            OpenStorage();
 
             if (MyFileStream.Length > 0)
             {
-                // 2. Existing file: Trust the disk
+                // 2. Existing file: Trust the disk.
                 LoadHeader();
                 LoadFreeList();
             }
             else
             {
-                // 3. New file: Trust the constructor arguments
-                Header.Magic = BTreeHeader.MagicConstant;
-                Header.Order = order;
-                Header.PageSize = BNode.CalculateNodeSize(Header.Order);
-                Header.RootId = -1;
-                Header.NodeCount = 0;
+                // 3. New file.
+                InitHeader(order);
                 SaveHeader();
             }
+        }
+
+        /// <summary>
+        /// Open the file stream. 
+        /// </summary>
+        private void OpenStorage()
+        {
+            const int BufferSize = 65536;
+
+            // Close existing if they were open (safety first)
+            MyWriter = null;
+            MyReader = null;
+            MyFileStream = null;
+
+            // The 64KB Buffer.
+            MyFileStream = new FileStream(MyFileName, FileMode.OpenOrCreate,
+                                          FileAccess.ReadWrite, FileShare.None, BufferSize);
+
+            MyReader = new BinaryReader(MyFileStream, System.Text.Encoding.UTF8, true);
+            MyWriter = new BinaryWriter(MyFileStream, System.Text.Encoding.UTF8, true);
+        }
+
+        /// <summary>
+        /// Initialize Header.
+        /// </summary>
+        /// <param name="order"></param>
+        private void InitHeader(int order)
+        {
+            Header.Magic = BTreeHeader.MagicConstant;
+            Header.Order = order;
+            Header.PageSize = BNode.CalculateNodeSize(order);
+            Header.RootId = -1;
+            Header.NodeCount = 0;
         }
 
         // ------ HELPER METHODS ------
@@ -109,10 +142,10 @@ namespace DiskTwo
         private long CalculateOffset(int disk)
         {
             if (disk < 0)
-                throw new ArgumentOutOfRangeException(nameof(disk), "Node ID cannot be negative.");
+                throw new ArgumentOutOfRangeException(nameof(disk), "Cannot be negative.");
 
             if (Header.PageSize < 64)
-                throw new ArgumentException("Invalid Page Size.");
+                throw new ArgumentException(nameof(Header.PageSize));
 
             return ((long)Header.PageSize * disk) + HeaderSize;
         }
@@ -180,18 +213,14 @@ namespace DiskTwo
         {
             if (disk < 0)
             {
-                throw new ArgumentOutOfRangeException("CRITICAL: Reading negative disk id.");
+                throw new ArgumentOutOfRangeException(nameof(disk), "Cannot be negative");
             }
 
             BNode readNode = new BNode(Header.Order);
             long offset = CalculateOffset(disk);
 
             MyFileStream.Seek(offset, SeekOrigin.Begin);
-
-            using (var reader = new BinaryReader(MyFileStream, System.Text.Encoding.UTF8, true))
-            {
-                readNode.Read(reader);
-            }
+            readNode.Read(MyReader);
             return readNode;
         }
 
@@ -203,17 +232,14 @@ namespace DiskTwo
         {
             if (node.Id < 0)
             {
-                throw new ArgumentOutOfRangeException("CRITICAL: Writing negative disk id.");
+                throw new ArgumentOutOfRangeException(nameof(node.Id), "Cannot be negative");
             }
 
             long offset = CalculateOffset(node.Id);
             MyFileStream.Seek(offset, SeekOrigin.Begin);
 
-            using (var writer = new BinaryWriter(MyFileStream, System.Text.Encoding.UTF8, true))
-            {
-                node.Write(writer);
-            }
-            MyFileStream.Flush();
+            node.Write(MyWriter);
+            //MyFileStream.Flush();
         }
 
         /// <summary>
@@ -223,7 +249,7 @@ namespace DiskTwo
         /// 
         public void ZeroNode(int id)
         {
-            if (id < 0) throw new ArgumentOutOfRangeException(nameof(id));
+            if (id < 0) throw new ArgumentOutOfRangeException(nameof(id), "Cannot be negative");
 
             // 1. Rent the buffer
             byte[] buffer = ArrayPool<byte>.Shared.Rent(Header.PageSize);
@@ -246,35 +272,6 @@ namespace DiskTwo
             }
         }
 
-        //public void ZeroNode(int id)
-        //{
-        //    // 1. Guard against invalid IDs
-        //    if (id < 0)
-        //    {
-        //        throw new ArgumentOutOfRangeException("Negative disk ID.");
-        //    }
-
-        //    // 2. Calculate the exact file position.
-        //    long offset = CalculateOffset(id);
-        //    MyFileStream.Seek(offset, SeekOrigin.Begin);
-
-        //    // 3. Perform the wipe.
-        //    // Ensure we write exactly one PageSize worth of zeros.
-        //    // If ZeroBuffer is smaller than PageSize, this should be done in a loop.
-        //    int remaining = Header.PageSize;
-        //    while (remaining > 0)
-        //    {
-        //        // Write either the full remaining page or the full buffer, whichever is smaller.
-        //        int toWrite = Math.Min(remaining, ZeroBuffer.Length);
-        //        MyFileStream.Write(ZeroBuffer, 0, toWrite);
-        //        remaining -= toWrite;
-        //    }
-
-        //    // 4. Force write to disk to ensure the sector is physically cleared.
-        //    MyFileStream.Flush();
-        //}
-
-
 
         /// <summary>
         /// Synchronizes the internal file stream with the underlying storage device to ensure all changes are persisted.
@@ -295,48 +292,33 @@ namespace DiskTwo
         /// </summary>
         public void SaveHeader()
         {
-            // 1. Rent a buffer from the shared pool (No allocation overhead!)
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(4096);
+            // 1. Rent the 4KB buffer
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(HeaderSize);
 
             try
             {
-                // 2. Use a Span to represent exactly 4096 bytes of that buffer
-                Span<byte> bufferSpan = buffer.AsSpan(0, 4096);
-                bufferSpan.Clear(); // Ensure it's zeroed out before writing
+                // 2. Clear the buffer to ensure the 4KB block is zero-filled.
+                Array.Clear(buffer, 0, HeaderSize);
 
-                // 3. Use a MemoryStream that doesn't "own" the memory
-                using (var ms = new MemoryStream(buffer, 0, 4096))
-                using (var writer = new BinaryWriter(ms))
+                // 3. Wrap the buffer in a MemoryStream so the Writer can use it
+                using (var ms = new MemoryStream(buffer, 0, HeaderSize))
+                using (var tempWriter = new BinaryWriter(ms, System.Text.Encoding.UTF8, leaveOpen: true))
                 {
-                    Header.Write(writer);
+                    // 4. Header writes to the buffer in memory.
+                    Header.Write(tempWriter);
                 }
 
-                // 4. Perform the high-speed write
+                // 5. One single blast to the disk.
                 MyFileStream.Seek(0, SeekOrigin.Begin);
-                MyFileStream.Write(bufferSpan);
+                MyFileStream.Write(buffer, 0, HeaderSize);
                 MyFileStream.Flush();
             }
             finally
             {
-                // 5. Return the buffer to the pool so it can be reused
+                // 6. Return the buffer
                 ArrayPool<byte>.Shared.Return(buffer);
             }
         }
-
-
-        //public void SaveHeader()
-        //{
-        //    byte[] buffer = new byte[4096];
-        //    using (var ms = new MemoryStream(buffer))
-        //    using (var writer = new BinaryWriter(ms))
-        //    {
-        //        Header.Write(writer);
-        //    }
-
-        //    MyFileStream.Seek(0, SeekOrigin.Begin);
-        //    MyFileStream.Write(buffer);
-        //    MyFileStream.Flush();
-        //}
 
         /// <summary>
         /// Load the B-Tree header from disk.
@@ -344,19 +326,16 @@ namespace DiskTwo
         public void LoadHeader()
         {
             MyFileStream.Seek(0, SeekOrigin.Begin);
-            using (var reader = new BinaryReader(MyFileStream, System.Text.Encoding.UTF8, true))
-            {
-                Header = BTreeHeader.Read(reader);
-            }
+            Header = BTreeHeader.Read(MyReader);
 
             if (Header.Magic != MagicConstant)
-                throw new Exception("Invalid B-Tree File.");
+                throw new InvalidDataException("Invalid File Format");
 
             if (Header.Order < 4)
                 throw new ArgumentException("Order must be at least 4.");
 
             if (Header.PageSize < 64 || Header.PageSize != BNode.CalculateNodeSize(Header.Order))
-                throw new ArgumentException("CORRUPTED: PageSize");
+                throw new ArgumentException(nameof(Header.PageSize));
         }
 
 
@@ -475,7 +454,7 @@ namespace DiskTwo
 
                 if (pos < 0 || pos > node.NumKeys)
                 {
-                    throw new Exception($"Invalid child index {pos} in node {node.Id}");
+                    throw new ArgumentException(nameof(pos));
                 }
                 BNode child = DiskRead(node.Kids[pos]);
 
@@ -1055,18 +1034,15 @@ namespace DiskTwo
             Header.FreeListCount = FreeList.Count;
 
             // 1. Move to the end of the file
-            using (var writer = new BinaryWriter(MyFileStream, System.Text.Encoding.UTF8, true))
-            {
-                long offset = writer.BaseStream.Length;
-                writer.BaseStream.Seek(offset, SeekOrigin.Begin);
-                Header.FreeListOffset = offset;
+            long offset = MyWriter.BaseStream.Length;
+            MyWriter.BaseStream.Seek(offset, SeekOrigin.Begin);
+            Header.FreeListOffset = offset;
 
-                // 2. Write the count followed by the stack data
-                // Iterate the stack to write free IDs to disk (the order is LIFO).
-                foreach (int id in FreeList)
-                {
-                    writer.Write(id);
-                }
+            // 2. Write the count followed by the stack data
+            // Iterate the stack to write free IDs to disk (the order is LIFO).
+            foreach (int id in FreeList)
+            {
+                MyWriter.Write(id);
             }
         }
 
@@ -1076,22 +1052,19 @@ namespace DiskTwo
         /// </summary>
         private void LoadFreeList()
         {
-            using (var reader = new BinaryReader(MyFileStream, System.Text.Encoding.UTF8, true))
+            if (Header.FreeListOffset == 0 || Header.FreeListCount == 0) return;
+
+            // 1. Jump to the list and populate the stack.
+            MyReader.BaseStream.Seek(Header.FreeListOffset, SeekOrigin.Begin);
+            FreeList.Clear();
+            for (int i = 0; i < Header.FreeListCount; i++)
             {
-                if (Header.FreeListOffset == 0 || Header.FreeListCount == 0) return;
-
-                // 1. Jump to the list and populate the stack.
-                reader.BaseStream.Seek(Header.FreeListOffset, SeekOrigin.Begin);
-                FreeList.Clear();
-                for (int i = 0; i < Header.FreeListCount; i++)
-                {
-                    FreeList.Add(reader.ReadInt32());
-                }
-
-                // 2. TRUNCATE: Cut the tail off the file.
-                // This removes the list data from the disk but keeps it in your memory Stack.
-                MyFileStream.SetLength(Header.FreeListOffset);
+                FreeList.Add(MyReader.ReadInt32());
             }
+
+            // 2. TRUNCATE: Cut the tail off the file.
+            // This removes the list data from the disk but keeps it in your memory Stack.
+            MyFileStream.SetLength(Header.FreeListOffset);
 
             Header.FreeListCount = 0;
             Header.FreeListOffset = 0;
@@ -1173,14 +1146,22 @@ namespace DiskTwo
                 newTree.SaveHeader();
             }
 
-            // 4. Swap files
-            MyFileStream.Close();
+            // 4. SHUT DOWN THE OLD STREAM
+            MyReader.Dispose();
+            MyWriter.Dispose(); // Dispose the writer first
+            MyFileStream.Dispose();
+
+            MyReader = null;
+            MyWriter = null;
+            MyFileStream = null;
+
+            // 5. Swap files
             string backupPath = MyFileName + ".bak";
             File.Replace(tempPath, MyFileName, backupPath);
             File.Delete(backupPath);
 
-            // Re-open the stream for the current instance
-            MyFileStream = new FileStream(MyFileName, FileMode.Open, FileAccess.ReadWrite);
+            // 7. Re-open the stream for the current instance.
+            OpenStorage();
             LoadHeader();
             FreeList.Clear(); // FreeList is now empty as all space is used.
         }
@@ -1215,7 +1196,7 @@ namespace DiskTwo
             // 2. Have we already been here before?
             if (liveNodes.Get(nodeId))
             {
-                throw new Exception($"Cycle Detected Node {nodeId}");
+                throw new ArgumentException(nameof(nodeId), "Cycle Detected");
             }
 
             // 3. Mark the node.
@@ -1445,7 +1426,7 @@ namespace DiskTwo
             // We use a HashSet for O(1) lookup speed during the crawl
             var uniqueSet = new HashSet<Element>();
 
-            if  (Header.RootId == -1)
+            if (Header.RootId == -1)
                 return new List<Element>();
 
             GetElementsRecursive(Header.RootId, uniqueSet, 0);
@@ -1461,7 +1442,7 @@ namespace DiskTwo
 
             // 2. Prevent infinite recursion (Safety check for corrupted disk pointers)
             if (depth > 64)
-                throw new InvalidOperationException("Cycle Detected");
+                throw new ArgumentException(nameof(depth), "Cycle Detected");
 
             // 3. Attempt Disk Read
             BNode node = DiskRead(nodeId);
@@ -1544,7 +1525,7 @@ namespace DiskTwo
                 {
                     int k = node.Kids[i];
                     if (k >= 0)
-                    { 
+                    {
                         var child = DiskRead(node.Kids[i]);
                         WriteToStream(sw, child);
                     }
@@ -1805,21 +1786,21 @@ namespace DiskTwo
             // Check for cycles.
             if (visited.Get(nodeId))
             {
-                throw new Exception($"Cycle Detected Node {nodeId}");
+                throw new ArgumentException(nameof(nodeId), "Cycle Detected");
             }
 
             BNode node = DiskRead(nodeId);
             visited.Set(nodeId, true);
             if (nodeId != Header.RootId && node.NumKeys == 0)
             {
-                throw new Exception($"Ghost Detected: Node {nodeId} is an internal node with 0 keys!");
+                throw new ArgumentException(nameof(nodeId), "Ghost Detected");
             }
 
             if (!node.Leaf)
             {
                 if (node.NumKeys > Header.Order)
                 {
-                    throw new Exception($"NumKeys Corrupted: {node.NumKeys}");
+                    throw new ArgumentException(nameof(node.NumKeys));
                 }
 
                 for (int i = 0; i <= node.NumKeys; i++)
@@ -1874,7 +1855,7 @@ namespace DiskTwo
 
             // Optional: Check if NodeCount matches what is actually on disk
             if (visited.Count > Header.NodeCount)
-                throw new Exception(message: "Integrity Error: Reachable nodes exceed Header.NodeCount.");
+                throw new Exception(message: "Reachable nodes cannot exceed NodeCount");
         }
 
         /// <summary>
@@ -1886,7 +1867,7 @@ namespace DiskTwo
             if (nodeId > visited.Count) return;
 
             if (visited.Get(nodeId))
-                throw new Exception($"Cycle Detected Node {nodeId}");
+                throw new ArgumentException(nameof(nodeId), "Cycle Detected");
 
             visited.Set(nodeId, true);
             BNode node = DiskRead(nodeId);
@@ -1894,7 +1875,7 @@ namespace DiskTwo
             // 1. Verify Minimum Keys (except the Root).
             int t = (Header.Order + 1) / 2;
             if (nodeId != Header.RootId && node.NumKeys < t - 1)
-                throw new Exception($"Underflow: Node {nodeId} has only {node.NumKeys} keys.");
+                throw new ArgumentException(nameof(nodeId), "Underflow");
 
             for (int i = 0; i < node.NumKeys; i++)
             {
@@ -1902,11 +1883,11 @@ namespace DiskTwo
 
                 // 2. Verify Key Ordering within node
                 if (i > 0 && currentKey <= node.Keys[i - 1].Key)
-                    throw new Exception($"Ordering Error: Node {nodeId} keys not sorted.");
+                    throw new ArgumentException(nameof(nodeId), "Must be sorted");
 
                 // 3. Verify Key is within Parent's Range
                 if (currentKey < min || currentKey > max)
-                    throw new Exception($"Boundary Error: Node {nodeId} Key {currentKey} outside range [{min}, {max}].");
+                    throw new ArgumentException(nameof(currentKey));
 
                 // 4. Recurse into children with updated boundaries.
                 if (!node.Leaf)

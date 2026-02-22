@@ -2,6 +2,6 @@
 {
     public class TestSettings
     {
-        public static bool CanDebugStress = true;
+        public static bool CanDebugStress = false;
     }
 }

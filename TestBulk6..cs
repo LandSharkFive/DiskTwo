@@ -7,7 +7,6 @@ namespace UnitTestSix
     [TestClass]
     public sealed class UnitSix
     {
-
         private bool IsDebugStress = TestSettings.CanDebugStress;
 
         /// <summary>Bulk Load with Low Order and Low Volume.</summary>

@@ -38,7 +38,7 @@
         public void CreateFromSorted(List<Element> keys, string path)
         {
             if (keys == null || keys.Count == 0) return;
-            if (!Util.IsSortedList(keys)) throw new ArgumentException("Keys must be sorted.");
+            if (!Util.IsSortedList(keys)) throw new ArgumentException(nameof(keys), "Must be sorted.");
 
             // Using block ensures the file is closed even if Build() fails
             using (Manager = new TreeManager(path, Order))

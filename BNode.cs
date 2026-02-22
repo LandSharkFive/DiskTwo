@@ -129,9 +129,9 @@ namespace DiskTwo
             // 2. Read Keys
             for (int i = 0; i < Order; i++)
             {
-                int k = reader.ReadInt32();
-                int d = reader.ReadInt32();
-                Keys[i] = new Element(k, d);
+                int key = reader.ReadInt32();
+                int data = reader.ReadInt32();
+                Keys[i] = new Element(key, data);
             }
 
             // 3. Read Children
@@ -201,7 +201,7 @@ namespace DiskTwo
             // 1. Check Key Count bounds.
             if (NumKeys < 0 || NumKeys > Order)
             {
-                throw new Exception("NumKey is invalid.");
+                throw new ArgumentException(nameof(NumKeys));
             }
 
             // 2. Check logical consistency: Internal nodes MUST have NumKeys + 1 children.
@@ -211,7 +211,7 @@ namespace DiskTwo
                 {
                     if (Kids[i] < 0)
                     {
-                        throw new Exception("Child is -1."); // Every active key needs a valid child path.
+                        throw new Exception("Child Id cannot be negative."); 
                     }
                 }
             }

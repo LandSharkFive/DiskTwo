@@ -35,7 +35,7 @@ namespace DiskTwo
             int magic = reader.ReadInt32();
             if (magic != MagicConstant)
             {
-                throw new InvalidDataException("Invalid B-Tree File.");
+                throw new InvalidDataException("Invalid File Format");
             }
 
             return new BTreeHeader
