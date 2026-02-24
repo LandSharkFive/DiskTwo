@@ -1,5 +1,6 @@
 ﻿using DiskTwo;
 using UnitTestMain;
+using UnitTestOne;
 
 namespace UnitTestThree
 {
@@ -424,7 +425,7 @@ namespace UnitTestThree
                 Assert.Inconclusive("Skipped");
             }
 
-            string testPath = Path.ChangeExtension(Path.GetRandomFileName(), "db");
+            string testPath = TestHelper.GetTempDb();   // Path.ChangeExtension(Path.GetRandomFileName(), "db");
             File.Delete(testPath);
 
             // 1. Setup: Generate sorted keys

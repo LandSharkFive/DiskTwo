@@ -1,5 +1,6 @@
 ﻿using DiskTwo;
 using UnitTestMain;
+using UnitTestOne;
 
 namespace UnitTestSix
 {
@@ -200,7 +201,7 @@ namespace UnitTestSix
             }
 
             Random rnd = new Random();
-            string myPath = Path.ChangeExtension(Path.GetRandomFileName(), "db");
+            string myPath = TestHelper.GetTempDb();      //Path.ChangeExtension(Path.GetRandomFileName(), "db");
             File.Delete(myPath);
 
             // Generate sorted data
@@ -283,7 +284,7 @@ namespace UnitTestSix
             }
 
             Random rnd = new Random();
-            string myPath = Path.ChangeExtension(Path.GetRandomFileName(), "db");
+            string myPath = TestHelper.GetTempDb();   // Path.ChangeExtension(Path.GetRandomFileName(), "db");
             File.Delete(myPath);
 
             // 1. Generate sorted data

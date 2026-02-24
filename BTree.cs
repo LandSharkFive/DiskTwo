@@ -339,7 +339,7 @@ namespace DiskTwo
         // --- SEARCH METHODS ---
 
         /// <summary>
-        /// Searches the tree for a key.
+        /// Attempts to locate an element in the B-Tree by its unique key.
         /// </summary>
         public bool TrySearch(int key, out Element result)
         {
@@ -347,31 +347,45 @@ namespace DiskTwo
             if (Header.RootId == -1) return false;
 
             BNode rootNode = DiskRead(Header.RootId);
-            return TrySearchRecursive(rootNode, key, out result);
+            return TrySearchIterative(rootNode, key, out result);
         }
 
         /// <summary>
-        /// Search the tree recursively for a key.
+        /// Performs an iterative search for a specific key within the B-Tree.
+        /// This implementation avoids recursion to minimize stack overhead and uses 
+        /// a tight loop for intra-node searching to maximize performance.
         /// </summary>
-        private bool TrySearchRecursive(BNode node, int key, out Element result)
+        private bool TrySearchIterative(BNode root, int key, out Element result)
         {
-            int i = 0;
-            while (i < node.NumKeys && key > node.Keys[i].Key) i++;
+            BNode currentNode = root;
 
-            if (i < node.NumKeys && key == node.Keys[i].Key)
+            while (currentNode != null)
             {
-                result = node.Keys[i];
-                return true;
+                int i = 0;
+                int numKeys = currentNode.NumKeys;
+                var keys = currentNode.Keys;
+
+                // Tight loop: No LINQ, no method calls
+                while (i < numKeys && key > keys[i].Key)
+                {
+                    i++;
+                }
+
+                if (i < numKeys && key == keys[i].Key)
+                {
+                    result = keys[i];
+                    return true;
+                }
+
+                if (currentNode.Leaf)
+                    break;
+
+                // Move to the next level without pushing to the stack
+                currentNode = DiskRead(currentNode.Kids[i]);
             }
 
-            if (node.Leaf)
-            {
-                result = Element.GetDefault();
-                return false;
-            }
-
-            BNode child = DiskRead(node.Kids[i]);
-            return TrySearchRecursive(child, key, out result);
+            result = Element.GetDefault();
+            return false;
         }
 
         // ------- INSERT METHODS --------
@@ -385,7 +399,9 @@ namespace DiskTwo
         }
 
         /// <summary>
-        /// Inserts a new element into the tree. 
+        /// Inserts an element into the B-Tree. If the tree is empty, it initializes the root. 
+        /// If the root is full, it performs a preemptive split to increase tree height 
+        /// before delegating to the recursive insertion logic.
         /// </summary>
         public void Insert(Element item)
         {
@@ -549,9 +565,9 @@ namespace DiskTwo
             }
         }
 
-
         /// <summary>
-        /// Allocates a new unique ID by claiming the next free slot on disk.
+        /// Provides a node ID for a new allocation by recycling an ID from the FreeList 
+        /// or, if none are available, appending a new ID at the end of the storage.
         /// </summary>
         public int GetNextId()
         {
@@ -1068,19 +1084,13 @@ namespace DiskTwo
             SaveHeader();
         }
 
+        /// <summary>
+        /// Displays the first 50 available IDs in the FreeList, used for tracking recycled disk space.
+        /// </summary>
         public void PrintFreeList()
         {
-            StringBuilder sb = new StringBuilder();
-            sb.Append("FreeList: ");
-            int count = 0;
-            foreach (var id in FreeList)
-            {
-                count++;
-                if (count > 50) break;
-                sb.Append(id);
-                sb.Append(" ");
-            }
-            Console.WriteLine(sb);
+            var ids = FreeList.Take(50);
+            Console.WriteLine($"FreeList: {string.Join(" ", ids)}");
         }
 
         /// ------- COMPACT METHODS -------
@@ -1432,6 +1442,10 @@ namespace DiskTwo
             return uniqueSet.ToList();
         }
 
+        /// <summary>
+        /// Performs an in-order traversal of the B-Tree to collect elements.
+        /// Traverses children and keys sequentially to maintain the tree's natural sort order.
+        /// </summary>
         private void GetElementsRecursive(int nodeId, HashSet<Element> result, int depth)
         {
             // 1. Validate Node ID
@@ -1459,7 +1473,7 @@ namespace DiskTwo
                 for (int i = 0; i <= node.NumKeys; i++)
                 {
                     // Visit Child branch
-                    if (node.Kids != null && i < node.Kids.Length)
+                    if (i < node.Kids.Length)
                     {
                         GetElementsRecursive(node.Kids[i], result, depth + 1);
                     }
@@ -1599,21 +1613,16 @@ namespace DiskTwo
         /// </summary>
         private static void PrintNodeKeys(BNode node)
         {
-            StringBuilder sb = new StringBuilder(128);
-            sb.Append("[");
-            for (int i = 0; i < node.NumKeys; i++)
-            {
-                if (i > 0) sb.Append(", ");
-                sb.Append(node.Keys[i].Key);
-            }
-            sb.Append("] ");
-            Console.Write(sb);
+            var keys = node.Keys.Take(node.NumKeys).Select(e => e.Key);
+            Console.Write($"[{string.Join(", ", keys)}] ");
         }
 
+
         /// <summary>
-        /// Print the tree breadth first (top-down, level by level).
+        /// Performs a breadth-first (level-order) traversal of the tree.
+        /// Visualizes the tree structure layer-by-layer, which is ideal for 
+        /// verifying balance and node distribution.
         /// </summary>
-        /// 
         private void PrintTreeSimple(int rootPageId)
         {
             if (rootPageId == -1)
@@ -1622,15 +1631,15 @@ namespace DiskTwo
                 return;
             }
 
-            Queue<(int pageId, int level)> queue = new Queue<(int, int)>();
+            var queue = new Queue<(int pageId, int level)>();
             queue.Enqueue((rootPageId, 0));
             int currentLevel = -1;
-            var sb = new System.Text.StringBuilder(128);
 
             while (queue.Count > 0)
             {
                 var (pageId, level) = queue.Dequeue();
 
+                // Handle level headers
                 if (level > currentLevel)
                 {
                     Console.WriteLine($"\n--- Level {level} ---");
@@ -1639,25 +1648,18 @@ namespace DiskTwo
 
                 BNode node = DiskRead(pageId);
 
-                // Build keys display without LINQ/allocation
-                sb.Clear();
-                for (int i = 0; i < node.NumKeys; i++)
-                {
-                    if (i > 0) sb.Append(", ");
-                    sb.Append(node.Keys[i].Key);
-                }
+                // Reuse our unified node printer
+                Console.Write($"NodeP{pageId}: ");
+                PrintNodeKeys(node);
+                Console.Write(" | ");
 
-                Console.Write($"NodeP{pageId}: [{sb}] | ");
-
+                // Enqueue children for the next level
                 if (!node.Leaf)
                 {
                     for (int i = 0; i <= node.NumKeys; i++)
                     {
-                        int childId = node.Kids[i];
-                        if (childId != -1)
-                        {
-                            queue.Enqueue((childId, level + 1));
-                        }
+                        if (node.Kids[i] != -1)
+                            queue.Enqueue((node.Kids[i], level + 1));
                     }
                 }
             }
@@ -1665,32 +1667,38 @@ namespace DiskTwo
         }
 
 
+
         /// <summary>
-        /// Print the physical disk nodes.
+        /// Outputs a physical representation of the underlying storage, 
+        /// iterating through every allocated page index to display node keys and metadata.
         /// </summary>
-        /// 
         public void DumpFile()
         {
             Console.WriteLine("--- PHYSICAL DISK DUMP ---");
-            Console.WriteLine($"RootId: {Header.RootId}");
-            var sb = new System.Text.StringBuilder(128);
+            Console.WriteLine($"RootId: {Header.RootId}, Total Nodes: {Header.NodeCount}");
 
             for (int i = 0; i < Header.NodeCount; i++)
             {
+                if (FreeList.Contains(i))
+                {
+                    Console.WriteLine($"Page {i}: [FREE]");
+                    continue;
+                }
+
                 try
                 {
                     BNode node = DiskRead(i);
-                    sb.Clear();
-                    for (int j = 0; j < node.NumKeys; j++)
-                    {
-                        if (j > 0) sb.Append(", ");
-                        sb.Append(node.Keys[j].Key);
-                    }
-                    Console.WriteLine($"Page {i}: [{sb}] (Leaf: {node.Leaf})");
+                    Console.Write($"Page {i}: ");
+                    PrintNodeKeys(node); 
+                    Console.WriteLine($"(Leaf: {node.Leaf})");
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Page {i}: [CORRUPT {ex.Message}]");
+                }
             }
         }
+
 
         /// <summary>
         /// Print Pointers.
@@ -1728,7 +1736,8 @@ namespace DiskTwo
         }
 
         /// <summary>
-        /// Print the children by depth first.
+        /// Recursively prints the B-Tree structure starting from a specific node, 
+        /// using indentation to visualize the hierarchy levels.
         /// </summary>
         private void PrintByRootRecursive(int nodeId, int level = 0)
         {
@@ -1736,20 +1745,17 @@ namespace DiskTwo
             BNode node = DiskRead(nodeId);
             string indent = new string(' ', level * 4);
 
-            Console.Write($"{indent}NODE {node.Id} (Keys: {node.NumKeys}): ");
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < node.NumKeys; i++)
-            {
-                sb.Append(node.Keys[i].Key);
-                sb.Append(" ");
-            }
-            Console.WriteLine(sb);
+            // 1. Print current node header and keys
+            Console.Write($"{indent}NODE {node.Id}: ");
+            PrintNodeKeys(node);
+            Console.WriteLine();
 
+            // 2. Recursively print children with increased indentation
             if (!node.Leaf)
             {
                 for (int i = 0; i <= node.NumKeys; i++)
                 {
-                    Console.WriteLine($"{indent}  Child {i} -> ID: {node.Kids[i]}");
+                    Console.WriteLine($"{indent}  Child {i} (ID: {node.Kids[i]})");
                     PrintByRootRecursive(node.Kids[i], level + 1);
                 }
             }
@@ -1758,7 +1764,8 @@ namespace DiskTwo
         // ----- GHOST NODES --------
 
         /// <summary>
-        /// Check for Ghost nodes.  
+        /// Validates the tree's structural integrity by ensuring no internal nodes are empty.
+        /// Empty non-root nodes ("Ghost Nodes") indicate a corruption in the balancing logic.
         /// </summary>
         public void CheckGhost()
         {
@@ -1768,7 +1775,8 @@ namespace DiskTwo
         }
 
         /// <summary>
-        /// Check for ghost nodes. A ghost is an internal node (non-root) with zero keys — this is invalid.
+        /// Recursively traverses the tree to verify that every reachable node contains data.
+        /// Also performs cycle detection and bounds checking on key counts.
         /// </summary>
         private void CheckGhostRecursive(int nodeId, BitArray visited = null)
         {
@@ -1856,7 +1864,9 @@ namespace DiskTwo
         }
 
         /// <summary>
-        /// Check Node Integrity. Check for cycles. 
+        /// Performs a deep structural audit of a node and its descendants. 
+        /// Validates key ordering, underflow conditions, and enforces that all 
+        /// child keys fall strictly within the logical boundaries defined by their parent keys.
         /// </summary>
         private void CheckNodeIntegrity(int nodeId, int min, int max, BitArray visited)
         {
@@ -1903,6 +1913,10 @@ namespace DiskTwo
 
         // -------- DIAGNOSTIC METHODS ---------
 
+        /// <summary>
+        /// Calculates the current height of the B-Tree by traversing the leftmost path 
+        /// from the root to a leaf node. Assumes the tree is balanced.
+        /// </summary>
         public int GetHeight()
         {
             int height = 0;

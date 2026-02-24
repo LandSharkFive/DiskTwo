@@ -95,25 +95,18 @@ namespace DiskTwo
         /// Primarily used for debugging and logging. It only iterates through NumKeys 
         /// to ensure the output reflects the logical contents of the node rather than the raw physical arrays.
         /// </remarks>
+        /// <summary>
+        /// Returns a multi-line string representing the node's current state, 
+        /// showing metadata, keys, and child pointers.
+        /// </summary>
         public override string ToString()
         {
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"Id: {Id},  Leaf: {Leaf}, NumKeys: {NumKeys}");
-            sb.Append("Keys: ");
-            for (int i = 0; i < NumKeys; i++)
-            {
-                sb.Append(Keys[i].Key);
-                sb.Append(" ");
-            }
-            sb.AppendLine();
-            sb.Append("Kids: ");
-            for (int i = 0; i <= NumKeys; i++)
-            {
-                sb.Append(Kids[i]);
-                sb.Append(" ");
-            }
-            sb.AppendLine();
-            return sb.ToString();
+            string keysStr = string.Join(" ", Keys.Take(NumKeys).Select(k => k.Key));
+            string kidsStr = Leaf ? "None (Leaf)" : string.Join(" ", Kids.Take(NumKeys + 1));
+
+            return $"Node {Id} (Leaf: {Leaf}, Keys: {NumKeys})\n" +
+                   $"Keys: [{keysStr}]\n" +
+                   $"Kids: [{kidsStr}]";
         }
 
         // <summary>

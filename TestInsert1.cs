@@ -222,7 +222,7 @@ namespace UnitTestOne
             }
 
             // 1. Setup
-            string testPath = Path.ChangeExtension(Path.GetRandomFileName(), "db");
+            string testPath = TestHelper.GetTempDb();    // Path.ChangeExtension(Path.GetRandomFileName(), "db");
             File.Delete(testPath);
             List<int> data = Enumerable.Range(1, count).ToList();
 
