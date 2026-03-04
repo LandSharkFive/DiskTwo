@@ -37,10 +37,6 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections;
-using System.IO;
-using System.Reflection.PortableExecutable;
-using System.Text;
-using System.Xml;
 
 namespace DiskTwo
 {
@@ -293,32 +289,8 @@ namespace DiskTwo
         /// </summary>
         public void SaveHeader()
         {
-            // 1. Rent the 4KB buffer
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(HeaderSize);
-
-            try
-            {
-                // 2. Clear the buffer to ensure the 4KB block is zero-filled.
-                Array.Clear(buffer, 0, HeaderSize);
-
-                // 3. Wrap the buffer in a MemoryStream so the Writer can use it
-                using (var ms = new MemoryStream(buffer, 0, HeaderSize))
-                using (var tempWriter = new BinaryWriter(ms, System.Text.Encoding.UTF8, leaveOpen: true))
-                {
-                    // 4. Header writes to the buffer in memory.
-                    Header.Write(tempWriter);
-                }
-
-                // 5. One single blast to the disk.
-                MyFileStream.Seek(0, SeekOrigin.Begin);
-                MyFileStream.Write(buffer, 0, HeaderSize);
-                MyFileStream.Flush();
-            }
-            finally
-            {
-                // 6. Return the buffer
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
+            MyFileStream.Seek(0, SeekOrigin.Begin);
+            Header.Write(MyWriter);
         }
 
         /// <summary>
@@ -1059,26 +1031,24 @@ namespace DiskTwo
             int totalBytes = FreeList.Count * 4;
 
             // Safety: use ArrayPool for large lists to avoid StackOverflow
-            byte[]? rentedArray = null;
-            Span<byte> buffer = totalBytes <= 4096
-                ? stackalloc byte[totalBytes]
-                : (rentedArray = ArrayPool<byte>.Shared.Rent(totalBytes)).AsSpan(0, totalBytes);
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(totalBytes);
+            Span<byte> span = buffer.AsSpan(0, totalBytes);
 
             try
             {
                 int currentOffset = 0;
                 foreach (int id in FreeList)
                 {
-                    BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(currentOffset, 4), id);
+                    BinaryPrimitives.WriteInt32LittleEndian(span.Slice(currentOffset, 4), id);
                     currentOffset += 4;
                 }
 
                 // 3. One single high-speed write to disk
-                MyWriter.Write(buffer);
+                MyWriter.Write(span);
             }
             finally
             {
-                if (rentedArray != null) ArrayPool<byte>.Shared.Return(rentedArray);
+                ArrayPool<byte>.Shared.Return(buffer);
             }
 
         }
@@ -1099,26 +1069,23 @@ namespace DiskTwo
             // 2. Bulk Read
             int totalBytes = Header.FreeListCount * 4;
 
-            // Safety check: Use ArrayPool if the list is massive, otherwise stackalloc.
-            byte[]? rentedArray = null;
-            Span<byte> buffer = totalBytes <= 4096
-                ? stackalloc byte[totalBytes]
-                : (rentedArray = ArrayPool<byte>.Shared.Rent(totalBytes)).AsSpan(0, totalBytes);
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(totalBytes);
+            Span<byte> span = buffer.AsSpan(0, totalBytes);
 
             try
             {
-                MyReader.BaseStream.ReadExactly(buffer); // Ensure we get everything
+                MyReader.BaseStream.ReadExactly(span); 
 
                 for (int i = 0; i < Header.FreeListCount; i++)
                 {
                     // Slice into the buffer 4 bytes at a time
-                    int nodeid = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(i * 4, 4));
-                    FreeList.Add(nodeid);
+                    int nodeId = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(i * 4, 4));
+                    FreeList.Add(nodeId);
                 }
             }
             finally
             {
-                if (rentedArray != null) ArrayPool<byte>.Shared.Return(rentedArray);
+                ArrayPool<byte>.Shared.Return(buffer);
             }
 
             // 3. TRUNCATE

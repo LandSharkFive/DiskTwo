@@ -9,6 +9,7 @@ namespace DiskTwo
     public class BNode
     {
         public int Order { get; set; }   // The maximum number of keys allowed.
+        public int PageSize { get; set; }  // The fixed size of the node record in bytes.
         public int NumKeys { get; set; }    // Number of keys the node has
         public bool Leaf { get; set; }     // Is this a leaf node? 
         public int Id { get; set; }  // Id of the node (record index) in the file
@@ -23,13 +24,11 @@ namespace DiskTwo
         public BNode(int order, bool leaf)
         {
             Order = order;
+            PageSize = CalculateNodeSize(order);
             Leaf = leaf;
             Keys = new Element[order];
             Kids = new int[order + 1];
-            for (int i = 0; i < order; i++)
-            {
-                Keys[i] = new Element(-1, -1); // Unique instances
-            }
+            Array.Fill(Keys, new Element(-1, -1)); 
             Array.Fill(Kids, -1);
         }
 
@@ -44,11 +43,6 @@ namespace DiskTwo
         /// </summary>
         public static int CalculateNodeSize(int order)
         {
-            // Three int32 = 12 bytes.
-            // Keys are (order) * two int32 = order * 8.
-            // Indexes are (order + 1) * int32 = (order * 4) + 4.
-            // Total is 16 + order * 8 + order * 4 = (order * 12) + 16.
-            // Simplify the math.
             return (order * 12) + 16;
         }
 
@@ -116,9 +110,8 @@ namespace DiskTwo
         /// 
         public void Read(BinaryReader reader)
         {
-            // 1. Calculate total size needed: 
-            int totalBytes = 12 + (Order * 8) + ((Order + 1) * 4);
-            Span<byte> buffer = stackalloc byte[totalBytes];
+            // 1. Allocate buffer.
+            Span<byte> buffer = stackalloc byte[PageSize];
             reader.Read(buffer);
 
             int offset = 0;
@@ -134,11 +127,9 @@ namespace DiskTwo
             // 3. Read Keys (The allocation bottleneck)
             for (int i = 0; i < Order; i++)
             {
-                int key = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
-                offset += 4;
-                int data = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
-                offset += 4;
-                Keys[i] = new Element(key, data);
+                Keys[i].Key = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
+                Keys[i].Data = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset + 4, 4));
+                offset += 8;
             }
 
             // 4. Read Children
@@ -158,14 +149,11 @@ namespace DiskTwo
         /// 
         public void Write(BinaryWriter writer)
         {
-            // 1. Calculate the total buffer size
-            int totalBytes = 12 + (Order * 8) + ((Order + 1) * 4);
-
-            // 2. Allocate a buffer. 
-            Span<byte> buffer = stackalloc byte[totalBytes];
+            // 1. Allocate a buffer. 
+            Span<byte> buffer = stackalloc byte[PageSize];
             int offset = 0;
 
-            // 3. Pack Metadata
+            // 2. Pack Metadata
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), Leaf ? 1 : 0);
             offset += 4;
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), NumKeys);
@@ -173,7 +161,7 @@ namespace DiskTwo
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), Id);
             offset += 4;
 
-            // 4. Pack Keys (Direct memory manipulation)
+            // 3. Pack Keys (Direct memory manipulation)
             for (int i = 0; i < Order; i++)
             {
                 int keyVal = (i < NumKeys) ? Keys[i].Key : -1;
@@ -185,7 +173,7 @@ namespace DiskTwo
                 offset += 4;
             }
 
-            // 5. Pack Children
+            // 4. Pack Children
             for (int i = 0; i <= Order; i++)
             {
                 int kidVal = (i <= NumKeys) ? Kids[i] : -1;
@@ -193,7 +181,7 @@ namespace DiskTwo
                 offset += 4;
             }
 
-            // 6. One single Write call to the underlying stream
+            // 5. One single Write call to the underlying stream
             writer.Write(buffer);
         }
 

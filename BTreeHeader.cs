@@ -1,6 +1,5 @@
 ﻿
 using System.Buffers.Binary;
-using System.Reflection.PortableExecutable;
 
 namespace DiskTwo
 {
@@ -43,7 +42,6 @@ namespace DiskTwo
         /// <summary> Deserializes the header fields from the current file stream. </summary>
         public static BTreeHeader Read(BinaryReader reader)
         {
-            // Total size: 6 ints (24 bytes) + 1 long (8 bytes) = 32 bytes
             Span<byte> buffer = stackalloc byte[32];
             reader.Read(buffer);
 

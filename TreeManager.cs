@@ -111,15 +111,8 @@
         /// </summary>
         public void SaveHeader()
         {
-            byte[] buffer = new byte[4096];
-            using (var ms = new MemoryStream(buffer))
-            using (var writer = new BinaryWriter(ms))
-            {
-                Header.Write(writer);
-            }
-
             MyFileStream.Seek(0, SeekOrigin.Begin);
-            MyWriter.Write(buffer);
+            Header.Write(MyWriter);
         }
 
 
