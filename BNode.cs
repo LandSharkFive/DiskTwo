@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Buffers.Binary;
+using System.Text;
 
 namespace DiskTwo
 {
@@ -81,7 +82,7 @@ namespace DiskTwo
             }
 
             int startWipingKids = Leaf ? 0 : NumKeys + 1;
-            for (int i = startWipingKids; i <= Order; i++)  
+            for (int i = startWipingKids; i <= Order; i++)
             {
                 Kids[i] = -1;
             }
@@ -112,60 +113,90 @@ namespace DiskTwo
         // <summary>
         /// Populates the node's properties and arrays by reading binary data from the provided stream.
         /// </summary>
+        /// 
         public void Read(BinaryReader reader)
         {
-            // 1. Read Metadata
-            Leaf = reader.ReadInt32() == 1;
-            NumKeys = reader.ReadInt32();
-            Id = reader.ReadInt32();
+            // 1. Calculate total size needed: 
+            int totalBytes = 12 + (Order * 8) + ((Order + 1) * 4);
+            Span<byte> buffer = stackalloc byte[totalBytes];
+            reader.Read(buffer);
 
-            // 2. Read Keys
+            int offset = 0;
+
+            // 2. Read Metadata
+            Leaf = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4)) == 1;
+            offset += 4;
+            NumKeys = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
+            offset += 4;
+            Id = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
+            offset += 4;
+
+            // 3. Read Keys (The allocation bottleneck)
             for (int i = 0; i < Order; i++)
             {
-                int key = reader.ReadInt32();
-                int data = reader.ReadInt32();
+                int key = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
+                offset += 4;
+                int data = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
+                offset += 4;
                 Keys[i] = new Element(key, data);
             }
 
-            // 3. Read Children
+            // 4. Read Children
             for (int i = 0; i <= Order; i++)
             {
-                Kids[i] = reader.ReadInt32();
+                Kids[i] = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
+                offset += 4;
             }
         }
+
 
         /// <summary>
         /// Serializes the node's current state into a binary format for persistent storage.
         /// </summary>
         /// <param name="writer">The <see cref="BinaryWriter"/> used to commit the node data to the file.</param>
         /// <remarks>
+        /// 
         public void Write(BinaryWriter writer)
         {
-            writer.Write(Leaf ? 1 : 0);
-            writer.Write(NumKeys);
-            writer.Write(Id);
+            // 1. Calculate the total buffer size
+            int totalBytes = 12 + (Order * 8) + ((Order + 1) * 4);
 
-            // Pack Keys
+            // 2. Allocate a buffer. 
+            Span<byte> buffer = stackalloc byte[totalBytes];
+            int offset = 0;
+
+            // 3. Pack Metadata
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), Leaf ? 1 : 0);
+            offset += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), NumKeys);
+            offset += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), Id);
+            offset += 4;
+
+            // 4. Pack Keys (Direct memory manipulation)
             for (int i = 0; i < Order; i++)
             {
-                if (i < NumKeys)
-                {
-                    writer.Write(Keys[i].Key);
-                    writer.Write(Keys[i].Data);
-                }
-                else
-                {
-                    writer.Write(-1); // Padding
-                    writer.Write(-1);
-                }
+                int keyVal = (i < NumKeys) ? Keys[i].Key : -1;
+                int dataVal = (i < NumKeys) ? Keys[i].Data : -1;
+
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), keyVal);
+                offset += 4;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), dataVal);
+                offset += 4;
             }
 
-            // Pack Children
+            // 5. Pack Children
             for (int i = 0; i <= Order; i++)
             {
-                writer.Write(i <= NumKeys ? Kids[i] : -1);
+                int kidVal = (i <= NumKeys) ? Kids[i] : -1;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), kidVal);
+                offset += 4;
             }
+
+            // 6. One single Write call to the underlying stream
+            writer.Write(buffer);
         }
+
 
         /// <summary>
         /// Performs a logical health check on the node to ensure key counts and child pointers are consistent.
@@ -204,7 +235,7 @@ namespace DiskTwo
                 {
                     if (Kids[i] < 0)
                     {
-                        throw new Exception("Child Id cannot be negative."); 
+                        throw new Exception("Child Id cannot be negative.");
                     }
                 }
             }

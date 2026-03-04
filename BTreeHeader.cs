@@ -1,4 +1,7 @@
 ﻿
+using System.Buffers.Binary;
+using System.Reflection.PortableExecutable;
+
 namespace DiskTwo
 {
     public struct BTreeHeader
@@ -18,21 +21,33 @@ namespace DiskTwo
         public long FreeListOffset; // Byte position where the FreeList data begins
 
         /// <summary> Serializes the header fields to the current file stream. </summary>
+
         public void Write(BinaryWriter writer)
         {
-            writer.Write(Magic);
-            writer.Write(Order);
-            writer.Write(RootId);
-            writer.Write(PageSize);
-            writer.Write(NodeCount);
-            writer.Write(FreeListCount);
-            writer.Write((long)FreeListOffset);
+            // Total size: 6 ints (24 bytes) + 1 long (8 bytes) = 32 bytes
+            Span<byte> buffer = stackalloc byte[32];
+
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(0, 4), Magic);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(4, 4), Order);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(8, 4), RootId);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(12, 4), PageSize);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(16, 4), NodeCount);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(20, 4), FreeListCount);
+            BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(24, 8), (long)FreeListOffset);
+
+            // One single trip to the stream/disk
+            writer.Write(buffer);
         }
+
 
         /// <summary> Deserializes the header fields from the current file stream. </summary>
         public static BTreeHeader Read(BinaryReader reader)
         {
-            int magic = reader.ReadInt32();
+            // Total size: 6 ints (24 bytes) + 1 long (8 bytes) = 32 bytes
+            Span<byte> buffer = stackalloc byte[32];
+            reader.Read(buffer);
+
+            int magic = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(0, 4));
             if (magic != MagicConstant)
             {
                 throw new InvalidDataException("Invalid File Format");
@@ -41,13 +56,14 @@ namespace DiskTwo
             return new BTreeHeader
             {
                 Magic = magic,
-                Order = reader.ReadInt32(),
-                RootId = reader.ReadInt32(),
-                PageSize = reader.ReadInt32(),
-                NodeCount = reader.ReadInt32(),
-                FreeListCount = reader.ReadInt32(),
-                FreeListOffset = reader.ReadInt64()
+                Order = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(4, 4)),
+                RootId = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(8, 4)),
+                PageSize = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(12, 4)),
+                NodeCount = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(16, 4)),
+                FreeListCount = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(20, 4)),
+                FreeListOffset = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(24, 8))
             };
         }
+
     }
 }

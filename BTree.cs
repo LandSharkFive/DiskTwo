@@ -35,8 +35,12 @@
 
 
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections;
+using System.IO;
+using System.Reflection.PortableExecutable;
 using System.Text;
+using System.Xml;
 
 namespace DiskTwo
 {
@@ -1051,13 +1055,34 @@ namespace DiskTwo
             MyWriter.BaseStream.Seek(offset, SeekOrigin.Begin);
             Header.FreeListOffset = offset;
 
-            // 2. Write the count followed by the stack data
-            // Iterate the stack to write free IDs to disk (the order is LIFO).
-            foreach (int id in FreeList)
+            // 2. Prepare the buffer
+            int totalBytes = FreeList.Count * 4;
+
+            // Safety: use ArrayPool for large lists to avoid StackOverflow
+            byte[]? rentedArray = null;
+            Span<byte> buffer = totalBytes <= 4096
+                ? stackalloc byte[totalBytes]
+                : (rentedArray = ArrayPool<byte>.Shared.Rent(totalBytes)).AsSpan(0, totalBytes);
+
+            try
             {
-                MyWriter.Write(id);
+                int currentOffset = 0;
+                foreach (int id in FreeList)
+                {
+                    BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(currentOffset, 4), id);
+                    currentOffset += 4;
+                }
+
+                // 3. One single high-speed write to disk
+                MyWriter.Write(buffer);
             }
+            finally
+            {
+                if (rentedArray != null) ArrayPool<byte>.Shared.Return(rentedArray);
+            }
+
         }
+
 
         /// <summary>
         /// Load the free list from disk into memory.
@@ -1067,16 +1092,36 @@ namespace DiskTwo
         {
             if (Header.FreeListOffset == 0 || Header.FreeListCount == 0) return;
 
-            // 1. Jump to the list and populate the stack.
+            // 1. Jump to the list
             MyReader.BaseStream.Seek(Header.FreeListOffset, SeekOrigin.Begin);
             FreeList.Clear();
-            for (int i = 0; i < Header.FreeListCount; i++)
+
+            // 2. Bulk Read
+            int totalBytes = Header.FreeListCount * 4;
+
+            // Safety check: Use ArrayPool if the list is massive, otherwise stackalloc.
+            byte[]? rentedArray = null;
+            Span<byte> buffer = totalBytes <= 4096
+                ? stackalloc byte[totalBytes]
+                : (rentedArray = ArrayPool<byte>.Shared.Rent(totalBytes)).AsSpan(0, totalBytes);
+
+            try
             {
-                FreeList.Add(MyReader.ReadInt32());
+                MyReader.BaseStream.ReadExactly(buffer); // Ensure we get everything
+
+                for (int i = 0; i < Header.FreeListCount; i++)
+                {
+                    // Slice into the buffer 4 bytes at a time
+                    int nodeid = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(i * 4, 4));
+                    FreeList.Add(nodeid);
+                }
+            }
+            finally
+            {
+                if (rentedArray != null) ArrayPool<byte>.Shared.Return(rentedArray);
             }
 
-            // 2. TRUNCATE: Cut the tail off the file.
-            // This removes the list data from the disk but keeps it in your memory Stack.
+            // 3. TRUNCATE
             MyFileStream.SetLength(Header.FreeListOffset);
 
             Header.FreeListCount = 0;
@@ -1689,7 +1734,7 @@ namespace DiskTwo
                 {
                     BNode node = DiskRead(i);
                     Console.Write($"Page {i}: ");
-                    PrintNodeKeys(node); 
+                    PrintNodeKeys(node);
                     Console.WriteLine($"(Leaf: {node.Leaf})");
                 }
                 catch (Exception ex)
