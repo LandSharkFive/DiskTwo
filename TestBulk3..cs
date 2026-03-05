@@ -26,7 +26,7 @@ namespace UnitTestThree
 
             // 2. Run Bulk Loader.  Default Capacity (80%).
             var builder = new TreeBuilder(order: 10);
-            builder.CreateFromSorted(data, myPath);
+            builder.CreateFromSorted(myPath, data);
 
             using (var tree = new BTree(myPath))
             {
@@ -72,7 +72,7 @@ namespace UnitTestThree
 
             // 2. Run Bulk Loader.  Default Capacity (80%).
             var builder = new TreeBuilder(order: 20);
-            builder.CreateFromSorted(data, myPath);
+            builder.CreateFromSorted(myPath, data);
 
 
             using (var tree = new BTree(myPath))
@@ -120,7 +120,7 @@ namespace UnitTestThree
 
             // 2. Run Bulk Loader.  Default Capacity (80%).
             var builder = new TreeBuilder(order: 30);
-            builder.CreateFromSorted(data, myPath);
+            builder.CreateFromSorted(myPath, data);
 
 
             using (var tree = new BTree(myPath))
@@ -164,7 +164,7 @@ namespace UnitTestThree
 
             // 2. Run Bulk Loader.  Full Capacity (80%).
             var builder = new TreeBuilder(order: 4, 1.0);
-            builder.CreateFromSorted(data, myPath);
+            builder.CreateFromSorted(myPath, data);
 
 
             using (var tree = new BTree(myPath))
@@ -207,7 +207,7 @@ namespace UnitTestThree
 
             // 2. Run Bulk Loader.  Full Capacity (80%).
             var builder = new TreeBuilder(order: 10, 1.0);
-            builder.CreateFromSorted(data, myPath);
+            builder.CreateFromSorted(myPath, data);
 
 
             using (var tree = new BTree(myPath))
@@ -252,7 +252,7 @@ namespace UnitTestThree
 
             // 2. Run Bulk Loader.  Full Capacity (80%).
             var builder = new TreeBuilder(order: 4, 1.0);
-            builder.CreateFromSorted(data, myPath);
+            builder.CreateFromSorted(myPath, data);
 
 
             using (var tree = new BTree(myPath))
@@ -308,7 +308,7 @@ namespace UnitTestThree
 
             // 2. Run Bulk Loader.  Full Capacity (100%).
             var builder = new TreeBuilder(order: 5, 1.0);
-            builder.CreateFromSorted(data, myPath);
+            builder.CreateFromSorted(myPath, data);
 
 
             using (var tree = new BTree(myPath))
@@ -361,7 +361,7 @@ namespace UnitTestThree
 
             // 2. Run Bulk Loader.  Full Capacity (100%).
             var builder = new TreeBuilder(order: 20, 1.0);
-            builder.CreateFromSorted(data, myPath);
+            builder.CreateFromSorted(myPath, data);
 
 
             using (var tree = new BTree(myPath))
@@ -434,7 +434,7 @@ namespace UnitTestThree
 
             var builder = new TreeBuilder(order: order, fill);
 
-            builder.CreateFromSorted(testKeys, testPath);
+            builder.CreateFromSorted(testPath, testKeys);
 
             using (var tree = new BTree(testPath))
             {

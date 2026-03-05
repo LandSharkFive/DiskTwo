@@ -264,7 +264,7 @@
 
             // 2. Run Bulk Loader.  Set fill factors to 1.0 (100%). 
             var builder = new TreeBuilder(order: 10, 1.0);
-            builder.CreateFromSorted(data, myPath);
+            builder.CreateFromSorted(myPath, data);
 
             using (var tree = new BTree(myPath))
             {
@@ -388,7 +388,7 @@
             Console.WriteLine($"--- Testing Order: {order}, Fill: {fill} ---");
             var builder = new TreeBuilder(order: order, fill);
 
-            builder.CreateFromSorted(testKeys, testPath);
+            builder.CreateFromSorted(testPath, testKeys);
 
             using (var tree = new BTree(testPath))
             {

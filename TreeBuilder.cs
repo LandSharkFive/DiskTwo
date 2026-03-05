@@ -35,8 +35,11 @@
         /// The entry point for building a tree. It validates the input, 
         /// manages the lifecycle of the TreeManager, and saves the final Root ID.
         /// </summary>
-        public void CreateFromSorted(List<Element> keys, string path)
+        public void CreateFromSorted(string path, List<Element> keys)
         {
+            if (string.IsNullOrEmpty(path))
+                throw new ArgumentException("Path cannot be empty.");
+
             if (keys == null || keys.Count == 0) return;
             if (!Util.IsSortedList(keys)) throw new ArgumentException(nameof(keys), "Must be sorted.");
 
