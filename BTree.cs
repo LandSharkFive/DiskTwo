@@ -248,25 +248,14 @@ namespace DiskTwo
         {
             if (id < 0) throw new ArgumentOutOfRangeException(nameof(id), "Cannot be negative");
 
-            // 1. Rent the buffer
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(Header.PageSize);
+            // 1. Create buffer on the stack.
+            Span<byte> buffer = stackalloc byte[Header.PageSize];
+            buffer.Clear();
 
-            try
-            {
-                // 2. Prepare the array.
-                Span<byte> zeroSpan = buffer.AsSpan(0, Header.PageSize);
-                zeroSpan.Clear();
-
-                // 3. Physical Write
-                long offset = CalculateOffset(id);
-                MyFileStream.Seek(offset, SeekOrigin.Begin);
-                MyFileStream.Write(zeroSpan);
-            }
-            finally
-            {
-                // 4. Return the buffer
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
+            // 2. Physical write.
+            long offset = CalculateOffset(id);
+            MyFileStream.Seek(offset, SeekOrigin.Begin);
+            MyFileStream.Write(buffer);
         }
 
 
@@ -1030,7 +1019,7 @@ namespace DiskTwo
             // 2. Prepare the buffer
             int totalBytes = FreeList.Count * 4;
 
-            // Safety: use ArrayPool for large lists to avoid StackOverflow
+            // 3. Use ArrayPool for large lists to avoid StackOverflow.
             byte[] buffer = ArrayPool<byte>.Shared.Rent(totalBytes);
             Span<byte> span = buffer.AsSpan(0, totalBytes);
 
@@ -1074,7 +1063,7 @@ namespace DiskTwo
 
             try
             {
-                MyReader.BaseStream.ReadExactly(span); 
+                MyReader.BaseStream.ReadExactly(span);
 
                 for (int i = 0; i < Header.FreeListCount; i++)
                 {
