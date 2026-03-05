@@ -206,15 +206,15 @@ namespace DiskTwo
         /// <summary>
         /// Retrieves stored data from physical storage.
         /// </summary>
-        public BNode DiskRead(int disk)
+        public BNode DiskRead(int id)
         {
-            if (disk < 0)
+            if (id < 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(disk), "Cannot be negative");
+                throw new ArgumentOutOfRangeException(nameof(id), "Cannot be negative");
             }
 
             BNode readNode = new BNode(Header.Order);
-            long offset = CalculateOffset(disk);
+            long offset = CalculateOffset(id);
 
             MyFileStream.Seek(offset, SeekOrigin.Begin);
             readNode.Read(MyReader);
