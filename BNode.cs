@@ -1,0 +1,233 @@
+﻿using System.Buffers.Binary;
+using System.Text;
+
+namespace DiskTwo
+{
+    /// <summary>
+    /// Represents a B-Tree node.
+    /// </summary>
+    public class BNode
+    {
+        public int Order { get; set; }   // The maximum number of keys allowed.
+        public int PageSize { get; set; }  // The fixed size of the node record in bytes.
+        public int NumKeys { get; set; }    // Number of keys the node has
+        public bool Leaf { get; set; }     // Is this a leaf node? 
+        public int Id { get; set; }  // Id of the node (record index) in the file
+
+        // Arrays replace C pointers and dynamic allocation.
+        public Element[] Keys { get; set; } // Holds the keys of the node (size: order - 1)
+        public int[] Kids { get; set; }     // Holds the children's disk positions (size: order)
+
+        /// <summary>
+        /// Initializes a new instance of a B-Tree node with specified capacity.
+        /// </summary>
+        public BNode(int order, bool leaf)
+        {
+            Order = order;
+            PageSize = CalculateNodeSize(order);
+            Leaf = leaf;
+            Keys = new Element[order];
+            Kids = new int[order + 1];
+            Array.Fill(Keys, new Element(-1, -1)); 
+            Array.Fill(Kids, -1);
+        }
+
+        /// <summary>
+        /// Initializes a new internal (non-leaf) B-Tree node.
+        /// </summary>
+        public BNode(int order) : this(order, false) { }
+
+
+        /// <summary>
+        /// Calculates the fixed size of a B-Tree node record in bytes.
+        /// </summary>
+        public static int CalculateNodeSize(int order)
+        {
+            return (order * 12) + 16;
+        }
+
+        /// <summary>
+        /// Remove Key and Child shrinks the node by shifting keys and child pointers left to overwrite the element. 
+        /// Decrements the key count and performs a nuclear wipe of all trailing slots to prevent data ghosting. 
+        /// Safely handles both leaf and internal node layouts by nullifying unused pointer indices.
+        /// </summary>
+        public void RemoveKeyAndChildAt(int pos)
+        {
+            // 1. Shift Keys to the left
+            for (int i = pos; i < Order - 2; i++)
+            {
+                Keys[i] = Keys[i + 1];
+            }
+
+            // 2. Shift Children to the left (removing the pointer at pos + 1)
+            for (int i = pos + 1; i < Order - 1; i++)
+            {
+                Kids[i] = Kids[i + 1];
+            }
+
+            // 3. Decrement
+            NumKeys--;
+
+            // 4. THE NUCLEAR WIPE: Hard-code the reset of the vacated slots
+            // We wipe everything from the new NumKeys to the end of the physical array
+            for (int i = NumKeys; i < Order; i++)  // order?
+            {
+                Keys[i] = new Element { Key = -1, Data = -1 };
+            }
+
+            int startWipingKids = Leaf ? 0 : NumKeys + 1;
+            for (int i = startWipingKids; i <= Order; i++)
+            {
+                Kids[i] = -1;
+            }
+        }
+
+        /// <summary>
+        /// Returns a human-readable string representation of the node's internal state.
+        /// </summary>
+        /// <returns>A formatted string containing the Node ID, Leaf status, Key values, and Child pointers.</returns>
+        /// <remarks>
+        /// Primarily used for debugging and logging. It only iterates through NumKeys 
+        /// to ensure the output reflects the logical contents of the node rather than the raw physical arrays.
+        /// </remarks>
+        /// <summary>
+        /// Returns a multi-line string representing the node's current state, 
+        /// showing metadata, keys, and child pointers.
+        /// </summary>
+        public override string ToString()
+        {
+            string keysStr = string.Join(" ", Keys.Take(NumKeys).Select(k => k.Key));
+            string kidsStr = Leaf ? "None (Leaf)" : string.Join(" ", Kids.Take(NumKeys + 1));
+
+            return $"Node {Id} (Leaf: {Leaf}, Keys: {NumKeys})\n" +
+                   $"Keys: [{keysStr}]\n" +
+                   $"Kids: [{kidsStr}]";
+        }
+
+        // <summary>
+        /// Populates the node's properties and arrays by reading binary data from the provided stream.
+        /// </summary>
+        /// 
+        public void Read(BinaryReader reader)
+        {
+            // 1. Allocate buffer.
+            Span<byte> buffer = stackalloc byte[PageSize];
+            reader.Read(buffer);
+
+            int offset = 0;
+
+            // 2. Read Metadata
+            Leaf = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4)) == 1;
+            offset += 4;
+            NumKeys = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
+            offset += 4;
+            Id = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
+            offset += 4;
+
+            // 3. Read Keys (The allocation bottleneck)
+            for (int i = 0; i < Order; i++)
+            {
+                Keys[i].Key = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
+                Keys[i].Data = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset + 4, 4));
+                offset += 8;
+            }
+
+            // 4. Read Children
+            for (int i = 0; i <= Order; i++)
+            {
+                Kids[i] = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset, 4));
+                offset += 4;
+            }
+        }
+
+
+        /// <summary>
+        /// Serializes the node's current state into a binary format for persistent storage.
+        /// </summary>
+        /// <param name="writer">The <see cref="BinaryWriter"/> used to commit the node data to the file.</param>
+        /// <remarks>
+        /// 
+        public void Write(BinaryWriter writer)
+        {
+            // 1. Allocate a buffer. 
+            Span<byte> buffer = stackalloc byte[PageSize];
+            int offset = 0;
+
+            // 2. Pack Metadata
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), Leaf ? 1 : 0);
+            offset += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), NumKeys);
+            offset += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), Id);
+            offset += 4;
+
+            // 3. Pack Keys (Direct memory manipulation)
+            for (int i = 0; i < Order; i++)
+            {
+                int keyVal = (i < NumKeys) ? Keys[i].Key : -1;
+                int dataVal = (i < NumKeys) ? Keys[i].Data : -1;
+
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), keyVal);
+                offset += 4;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), dataVal);
+                offset += 4;
+            }
+
+            // 4. Pack Children
+            for (int i = 0; i <= Order; i++)
+            {
+                int kidVal = (i <= NumKeys) ? Kids[i] : -1;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(offset, 4), kidVal);
+                offset += 4;
+            }
+
+            // 5. One single Write call to the underlying stream
+            writer.Write(buffer);
+        }
+
+
+        /// <summary>
+        /// Performs a logical health check on the node to ensure key counts and child pointers are consistent.
+        /// </summary>
+        public bool Validate()
+        {
+            // 1. Check Key Count bounds.
+            if (NumKeys < 0 || NumKeys > Order) return false;
+
+            // 2. Check logical consistency: Internal nodes MUST have NumKeys + 1 children.
+            if (!Leaf)
+            {
+                for (int i = 0; i <= NumKeys; i++)
+                {
+                    if (Kids[i] < 0) return false; // Every active key needs a valid child path.
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Validates the node's integrity and throws an exception if any structural corruption is detected.
+        /// </summary>
+        public void ValidateAndThrow()
+        {
+            // 1. Check Key Count bounds.
+            if (NumKeys < 0 || NumKeys > Order)
+            {
+                throw new ArgumentException(nameof(NumKeys));
+            }
+
+            // 2. Check logical consistency: Internal nodes MUST have NumKeys + 1 children.
+            if (!Leaf)
+            {
+                for (int i = 0; i <= NumKeys; i++)
+                {
+                    if (Kids[i] < 0)
+                    {
+                        throw new Exception("Child Id cannot be negative.");
+                    }
+                }
+            }
+        }
+
+    }
+}
