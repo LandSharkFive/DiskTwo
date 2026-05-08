@@ -1,0 +1,36 @@
+﻿namespace DiskTwo
+{
+
+    /// <summary>
+    /// Represents a key-data pair stored in the B-Tree.
+    /// </summary>
+    public struct Element : IComparable<Element> 
+    {
+        public int Key;   // The key of the element
+        public int Data; // That data that each element contains
+
+        /// <summary> Initializes a new empty element with sentinel values. </summary>
+        public Element() { Key = -1; Data = -1; }
+
+        /// <summary> Initializes an element with a specific key and data pair. </summary>
+        public Element(int key, int data) { Key = key; Data = data; }
+
+        /// <summary> Returns a sentinel element representing an empty or null state. </summary>
+        public static Element GetDefault() => new Element(-1, -1);
+
+        /// <summary> Compares elements based solely on their Key property. </summary>
+        public int CompareTo(Element other)
+        {
+            return this.Key.CompareTo(other.Key);
+        }
+
+        /// <summary> Returns a formatted string for debugging: [Key, Data]. </summary>
+        public override string ToString()
+        {
+            return $"[{Key}, {Data}] ";
+        }
+
+
+    }
+
+}
